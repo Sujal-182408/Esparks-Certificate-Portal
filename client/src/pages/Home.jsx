@@ -108,7 +108,7 @@ export default function Home() {
               sm:text-lg
             "
           >
-            CertiVerify provides a secure and reliable way to verify certificates
+            ESPARKS IT SOLUTIONS provides a secure and reliable way to verify certificates
             using unique verification tokens and QR codes.
           </p>
 
@@ -330,7 +330,7 @@ export default function Home() {
             </h3>
 
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Verify certificate information directly against the CertiVerify
+              Verify certificate information directly against the ESPARKS IT SOLUTIONS
               system.
             </p>
           </div>

@@ -157,3 +157,51 @@ export function generateEmployeeQR() {
     method: "POST",
   });
 }
+
+/* =========================================================
+   ADMIN NOTIFICATIONS
+========================================================= */
+
+export function getAdminNotifications() {
+  return apiRequest("/admin/notifications");
+}
+
+export function getAdminUnreadNotificationCount() {
+  return apiRequest("/admin/notifications/unread-count");
+}
+
+export function markAdminNotificationAsRead(id) {
+  return apiRequest(`/admin/notifications/${id}/read`, {
+    method: "PATCH",
+  });
+}
+
+export function markAllAdminNotificationsAsRead() {
+  return apiRequest("/admin/notifications/read-all", {
+    method: "PATCH",
+  });
+}
+
+/* =========================================================
+   EMPLOYEE NOTIFICATIONS
+========================================================= */
+
+export function getEmployeeNotifications() {
+  return apiRequest("/employee/notifications");
+}
+
+export function getEmployeeUnreadNotificationCount() {
+  return apiRequest("/employee/notifications/unread-count");
+}
+
+export function markEmployeeNotificationAsRead(id) {
+  return apiRequest(`/employee/notifications/${id}/read`, {
+    method: "PATCH",
+  });
+}
+
+export function markAllEmployeeNotificationsAsRead() {
+  return apiRequest("/employee/notifications/read-all", {
+    method: "PATCH",
+  });
+}

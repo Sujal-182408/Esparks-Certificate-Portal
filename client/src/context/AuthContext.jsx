@@ -42,6 +42,10 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // ================================
+  // INITIAL SESSION CHECK
+  // ================================
+
   useEffect(() => {
     let mounted = true;
 
@@ -55,12 +59,6 @@ export function AuthProvider({ children }) {
           setUser(data?.employee || null);
         }
       } catch (error) {
-        /*
-         * 401 simply means there is currently
-         * no employee session.
-         *
-         * This is NOT an error for the admin area.
-         */
         if (error.status !== 401) {
           console.error(
             "Employee session check failed:",
@@ -132,7 +130,9 @@ export function AuthProvider({ children }) {
         }
       );
 
-      setUser(data?.employee || null);
+      const employee = data?.employee || null;
+
+      setUser(employee);
 
       return data;
     } finally {

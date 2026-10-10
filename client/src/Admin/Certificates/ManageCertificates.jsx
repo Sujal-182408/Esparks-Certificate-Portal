@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Eye, Pencil, Ban, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Eye,
+  Pencil,
+  Ban,
+  RefreshCw,
+} from "lucide-react";
 
 import "./ManageCertificate.css";
 
@@ -10,17 +17,14 @@ export default function ManageCertificates() {
   const navigate = useNavigate();
 
   const [certificates, setCertificates] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [revokingId, setRevokingId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // ========================================
-  // FETCH CERTIFICATES
-  // ========================================
   const fetchCertificates = async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       setError("");
 
       const response = await fetch(
@@ -42,7 +46,11 @@ export default function ManageCertificates() {
         );
       }
 
-      setCertificates(data?.certificates || []);
+      setCertificates(
+        Array.isArray(data?.certificates)
+          ? data.certificates
+          : []
+      );
     } catch (error) {
       console.error("Certificate fetch error:", error);
 
@@ -50,20 +58,14 @@ export default function ManageCertificates() {
         error?.message || "Unable to fetch certificates."
       );
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // ========================================
-  // INITIAL LOAD
-  // ========================================
   useEffect(() => {
     fetchCertificates();
   }, []);
 
-  // ========================================
-  // FORMAT DATE
-  // ========================================
   const formatDate = (date) => {
     if (!date) return "—";
 
@@ -80,32 +82,29 @@ export default function ManageCertificates() {
     });
   };
 
-  // ========================================
-  // VIEW
-  // ========================================
   const handleView = (id) => {
     navigate(`/admin/certificates/${id}`);
   };
 
-  // ========================================
-  // EDIT
-  // ========================================
   const handleEdit = (id) => {
     navigate(`/admin/certificates/${id}/edit`);
   };
 
-  // ========================================
-  // REVOKE
-  // ========================================
   const handleRevoke = async (certificate) => {
     if (!certificate?.id) return;
 
-    if (certificate.status === "revoked") return;
+    if (certificate.status === "revoked") {
+      return;
+    }
 
     const confirmed = window.confirm(
       `Are you sure you want to revoke certificate "${certificate.certificate_no}"?\n\n` +
-        `Recipient: ${certificate.recipient_name || "—"}\n` +
-        `Course: ${certificate.course_name || "—"}\n\n` +
+        `Recipient: ${
+          certificate.recipient_name || "—"
+        }\n` +
+        `Course: ${
+          certificate.course_name || "—"
+        }\n\n` +
         `After revocation, this certificate will no longer be considered valid.`
     );
 
@@ -131,13 +130,15 @@ export default function ManageCertificates() {
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to revoke certificate."
+          data?.message ||
+            "Failed to revoke certificate."
         );
       }
 
       setCertificates((current) =>
         current.map((item) =>
-          String(item.id) === String(certificate.id)
+          String(item.id) ===
+          String(certificate.id)
             ? {
                 ...item,
                 status: "revoked",
@@ -154,7 +155,10 @@ export default function ManageCertificates() {
           `Certificate ${certificate.certificate_no} has been revoked successfully.`
       );
     } catch (error) {
-      console.error("Certificate revoke error:", error);
+      console.error(
+        "Certificate revoke error:",
+        error
+      );
 
       setError(
         error?.message ||
@@ -165,53 +169,31 @@ export default function ManageCertificates() {
     }
   };
 
-  // ========================================
-  // STATISTICS
-  // ========================================
   const totalCertificates = certificates.length;
 
   const issuedCertificates = certificates.filter(
-    (certificate) => certificate.status === "issued"
+    (certificate) =>
+      certificate.status === "issued"
   ).length;
 
   const revokedCertificates = certificates.filter(
-    (certificate) => certificate.status === "revoked"
+    (certificate) =>
+      certificate.status === "revoked"
   ).length;
 
-  // ========================================
-  // LOADING
-  // ========================================
-  if (loading) {
-    return (
-      <div className="manage-certificate">
-        <div className="certificate-loading">
-          <div className="certificate-spinner"></div>
-
-          <p>Loading certificates...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ========================================
-  // MAIN
-  // ========================================
   return (
     <div className="manage-certificate">
       <div className="manage-container">
-
-        {/* ==================================
-            TOP NAVIGATION
-        ================================== */}
+        {/* =========================
+            TOP BAR
+        ========================= */}
         <div className="manage-topbar">
-
           <button
             type="button"
             className="back-dashboard-btn"
             onClick={() => navigate("/admin")}
           >
             <ArrowLeft size={17} />
-
             <span>Back to Dashboard</span>
           </button>
 
@@ -219,56 +201,61 @@ export default function ManageCertificates() {
             type="button"
             className="refresh-btn"
             onClick={fetchCertificates}
+            disabled={refreshing}
             title="Refresh certificates"
           >
-            <RefreshCw size={17} />
+            <RefreshCw
+              size={17}
+              className={
+                refreshing
+                  ? "refresh-spinning"
+                  : ""
+              }
+            />
 
-            <span>Refresh</span>
+            <span>
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </span>
           </button>
-
         </div>
 
-        {/* ==================================
+        {/* =========================
             HEADER
-        ================================== */}
+        ========================= */}
         <div className="manage-header">
-
           <div className="manage-title-section">
-
             <p className="manage-label">
               CERTIFICATE MANAGEMENT
             </p>
 
-            <h1>
-              Manage Certificates
-            </h1>
+            <h1>Manage Certificates</h1>
 
             <p className="manage-description">
               View, edit and revoke issued certificates.
             </p>
-
           </div>
 
           <button
             type="button"
             className="add-certificate-btn"
             onClick={() =>
-              navigate("/admin/certificates/new")
+              navigate(
+                "/admin/certificates/new"
+              )
             }
           >
             <Plus size={18} />
-
             <span>Add Certificate</span>
           </button>
-
         </div>
 
-        {/* ==================================
-            SUCCESS
-        ================================== */}
+        {/* =========================
+            SUCCESS MESSAGE
+        ========================= */}
         {success && (
           <div className="certificate-success">
-
             <div>
               <strong>Success</strong>
 
@@ -277,21 +264,21 @@ export default function ManageCertificates() {
 
             <button
               type="button"
-              onClick={() => setSuccess("")}
+              onClick={() =>
+                setSuccess("")
+              }
               aria-label="Close success message"
             >
               ×
             </button>
-
           </div>
         )}
 
-        {/* ==================================
-            ERROR
-        ================================== */}
+        {/* =========================
+            ERROR MESSAGE
+        ========================= */}
         {error && (
           <div className="certificate-error">
-
             <div>
               <strong>
                 Certificate operation failed
@@ -302,20 +289,20 @@ export default function ManageCertificates() {
 
             <button
               type="button"
-              onClick={() => setError("")}
+              onClick={() =>
+                setError("")
+              }
               aria-label="Close error message"
             >
               ×
             </button>
-
           </div>
         )}
 
-        {/* ==================================
-            STATISTICS
-        ================================== */}
+        {/* =========================
+            STATS
+        ========================= */}
         <div className="certificate-stats">
-
           <div className="stat-card">
             <span>Total Certificates</span>
 
@@ -339,121 +326,104 @@ export default function ManageCertificates() {
               {revokedCertificates}
             </strong>
           </div>
-
         </div>
 
-        {/* ==================================
+        {/* =========================
             EMPTY STATE
-        ================================== */}
-        {!error && certificates.length === 0 && (
-          <div className="no-certificates">
+        ========================= */}
+        {!error &&
+          certificates.length === 0 && (
+            <div className="no-certificates">
+              <div className="empty-icon">
+                <Ban size={32} />
+              </div>
 
-            <div className="empty-icon">
-              <Ban size={32} />
+              <h2>
+                No certificates found
+              </h2>
+
+              <p>
+                Create your first certificate
+                to see it here.
+              </p>
+
+              <button
+                type="button"
+                className="empty-create-btn"
+                onClick={() =>
+                  navigate(
+                    "/admin/certificates/new"
+                  )
+                }
+              >
+                <Plus size={18} />
+                Create Certificate
+              </button>
             </div>
+          )}
 
-            <h2>
-              No certificates found
-            </h2>
-
-            <p>
-              Create your first certificate to see it here.
-            </p>
-
-            <button
-              type="button"
-              className="empty-create-btn"
-              onClick={() =>
-                navigate("/admin/certificates/new")
-              }
-            >
-              <Plus size={18} />
-
-              Create Certificate
-            </button>
-
-          </div>
-        )}
-
-        {/* ==================================
+        {/* =========================
             CERTIFICATE TABLE
-        ================================== */}
+        ========================= */}
         {certificates.length > 0 && (
           <div className="certificate-table-wrapper">
-
             <div className="table-scroll">
-
               <table className="certificate-table">
-
                 <thead>
                   <tr>
-
                     <th>
                       Certificate No.
                     </th>
 
-                    <th>
-                      Recipient
-                    </th>
+                    <th>Recipient</th>
 
-                    <th>
-                      Course
-                    </th>
+                    <th>Course</th>
 
-                    <th>
-                      Issuer
-                    </th>
+                    <th>Issuer</th>
 
-                    <th>
-                      Issue Date
-                    </th>
+                    <th>Issue Date</th>
 
-                    <th>
-                      Status
-                    </th>
+                    <th>Status</th>
 
-                    <th>
-                      Actions
-                    </th>
-
+                    <th>Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-
                   {certificates.map(
                     (certificate) => {
-
                       const isRevoked =
-                        certificate.status === "revoked";
+                        certificate.status ===
+                        "revoked";
 
                       const isRevoking =
-                        String(revokingId) ===
-                        String(certificate.id);
+                        String(
+                          revokingId
+                        ) ===
+                        String(
+                          certificate.id
+                        );
 
                       return (
-                        <tr key={certificate.id}>
-
+                        <tr
+                          key={
+                            certificate.id
+                          }
+                        >
                           {/* CERTIFICATE NUMBER */}
                           <td>
                             <span className="certificate-number">
-                              {
-                                certificate.certificate_no ||
-                                "—"
-                              }
+                              {certificate.certificate_no ||
+                                "—"}
                             </span>
                           </td>
 
                           {/* RECIPIENT */}
                           <td>
-
                             <div className="recipient-cell">
-
                               <strong>
-                                {
-                                  certificate.recipient_name ||
-                                  "—"
-                                }
+                                {certificate.recipient_name ||
+                                  "—"}
                               </strong>
 
                               {certificate.employee_email && (
@@ -463,30 +433,24 @@ export default function ManageCertificates() {
                                   }
                                 </span>
                               )}
-
                             </div>
-
                           </td>
 
                           {/* COURSE */}
                           <td>
                             <span className="course-cell">
-                              {
-                                certificate.course_name ||
-                                "—"
-                              }
+                              {certificate.course_name ||
+                                "—"}
                             </span>
                           </td>
 
                           {/* ISSUER */}
                           <td>
-                            {
-                              certificate.issuer_name ||
-                              "—"
-                            }
+                            {certificate.issuer_name ||
+                              "—"}
                           </td>
 
-                          {/* DATE */}
+                          {/* ISSUE DATE */}
                           <td>
                             {formatDate(
                               certificate.issue_date
@@ -495,9 +459,7 @@ export default function ManageCertificates() {
 
                           {/* STATUS */}
                           <td>
-
                             <div className="status-wrapper">
-
                               <span
                                 className={`certificate-status ${
                                   certificate.status ===
@@ -509,10 +471,8 @@ export default function ManageCertificates() {
                                     : "status-default"
                                 }`}
                               >
-                                {
-                                  certificate.status ||
-                                  "unknown"
-                                }
+                                {certificate.status ||
+                                  "unknown"}
                               </span>
 
                               {certificate.revoked_at && (
@@ -523,16 +483,13 @@ export default function ManageCertificates() {
                                   )}
                                 </small>
                               )}
-
                             </div>
-
                           </td>
 
                           {/* ACTIONS */}
                           <td>
-
                             <div className="certificate-actions">
-
+                              {/* VIEW */}
                               <button
                                 type="button"
                                 className="view-btn"
@@ -543,13 +500,16 @@ export default function ManageCertificates() {
                                 }
                                 title="View certificate"
                               >
-                                <Eye size={15} />
+                                <Eye
+                                  size={15}
+                                />
 
                                 <span>
                                   View
                                 </span>
                               </button>
 
+                              {/* EDIT */}
                               <button
                                 type="button"
                                 className="edit-btn"
@@ -558,20 +518,25 @@ export default function ManageCertificates() {
                                     certificate.id
                                   )
                                 }
-                                disabled={isRevoked}
+                                disabled={
+                                  isRevoked
+                                }
                                 title={
                                   isRevoked
                                     ? "Revoked certificates cannot be edited"
                                     : "Edit certificate"
                                 }
                               >
-                                <Pencil size={15} />
+                                <Pencil
+                                  size={15}
+                                />
 
                                 <span>
                                   Edit
                                 </span>
                               </button>
 
+                              {/* REVOKE */}
                               <button
                                 type="button"
                                 className="revoke-btn"
@@ -590,7 +555,9 @@ export default function ManageCertificates() {
                                     : "Revoke certificate"
                                 }
                               >
-                                <Ban size={15} />
+                                <Ban
+                                  size={15}
+                                />
 
                                 <span>
                                   {isRevoking
@@ -600,50 +567,38 @@ export default function ManageCertificates() {
                                     : "Revoke"}
                                 </span>
                               </button>
-
                             </div>
-
                           </td>
-
                         </tr>
                       );
                     }
                   )}
-
                 </tbody>
-
               </table>
-
             </div>
 
-            {/* Mobile scroll hint */}
             <div className="mobile-table-hint">
-              ← Swipe horizontally to view all certificate details →
+              ← Swipe horizontally to view all
+              certificate details →
             </div>
-
           </div>
         )}
 
-        {/* ==================================
-            FOOTER
-        ================================== */}
+        {/* =========================
+            COUNT
+        ========================= */}
         {certificates.length > 0 && (
           <div className="certificate-count">
-
             Showing{" "}
-
             <strong>
               {certificates.length}
             </strong>{" "}
-
             certificate
             {certificates.length !== 1
               ? "s"
               : ""}
-
           </div>
         )}
-
       </div>
     </div>
   );

@@ -2,421 +2,1093 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
-  FileBadge,
+  Award,
   Users,
-  PlusCircle,
+  FilePlus2,
+  Bell,
+  ArrowRight,
   LogOut,
+  CheckCircle2,
+  Clock3,
+  XCircle,
+  LockKeyhole,
+  LayoutDashboard,
+  ChevronRight,
 } from "lucide-react";
 
-import { apiRequest } from "../services/api";
+import "./AdminDashboard.css";
+
+import {
+  getAdminNotifications,
+  markAdminNotificationAsRead,
+} from "../services/api";
+
+const API_BASE = "/api";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
   const [admin, setAdmin] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
 
-  // =========================================================
-  // LOAD ADMIN SESSION
-  // =========================================================
+  const [stats, setStats] = useState({
+    employees: 0,
+    certificates: 0,
+    pendingRequests: 0,
+    notifications: 0,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [error, setError] = useState("");
+
+  const [notifications, setNotifications] = useState([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadAdmin() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const data = await apiRequest("/auth/me");
-
-        // Make sure backend actually returned an admin
-        if (!data?.admin) {
-          throw new Error("Admin authentication required.");
-        }
-
-        if (data.admin.role !== "admin") {
-          throw new Error("Invalid administrator session.");
-        }
-
-        if (!active) return;
-
-        // Successful authentication
-        setAdmin(data.admin);
-
-        // Clear any previous/stale error
-        setError("");
-      } catch (err) {
-        console.error("ADMIN PROFILE ERROR:", err);
-
-        if (!active) return;
-
-        setAdmin(null);
-        setError(
-          err?.message || "Could not load admin profile."
-        );
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadAdmin();
-
-    return () => {
-      active = false;
-    };
+    checkAdminSession();
   }, []);
 
-  // =========================================================
-  // LOGOUT
-  // =========================================================
-
-  async function handleLogout() {
+  async function checkAdminSession() {
     try {
-      setLoggingOut(true);
+      setLoading(true);
       setError("");
 
-      await apiRequest("/auth/logout", {
-        method: "POST",
+      const response = await fetch(`${API_BASE}/auth/me`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
       });
 
-      setAdmin(null);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data?.admin?.role !== "admin") {
+        navigate("/admin/login", {
+          replace: true,
+        });
+
+        return;
+      }
+
+      setAdmin(data.admin);
+
+      await loadDashboardStats();
+      await loadNotifications();
+    } catch (error) {
+      console.error("Admin session error:", error);
 
       navigate("/admin/login", {
         replace: true,
       });
-    } catch (err) {
-      console.error("ADMIN LOGOUT ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      setError(
-        err?.message || "Logout failed. Please try again."
+  /*
+  ============================================================
+  LOAD ADMIN NOTIFICATIONS
+  ============================================================
+  */
+
+  async function loadNotifications() {
+    try {
+      const data = await getAdminNotifications();
+
+      const list = Array.isArray(data?.notifications)
+        ? data.notifications
+        : [];
+
+      setNotifications(list);
+
+      setStats((prev) => ({
+        ...prev,
+        notifications: Number(data?.unreadCount || 0),
+      }));
+    } catch (error) {
+      console.error("Admin notifications error:", error);
+    }
+  }
+
+  /*
+  ============================================================
+  LOAD DASHBOARD STATISTICS
+  ============================================================
+  */
+
+  async function loadDashboardStats() {
+    try {
+      const [
+        employeesResponse,
+        certificatesResponse,
+        requestsResponse,
+      ] = await Promise.all([
+        fetch(`${API_BASE}/admin/employees`, {
+          credentials: "include",
+        }).catch(() => null),
+
+        fetch(`${API_BASE}/admin/certificates`, {
+          credentials: "include",
+        }).catch(() => null),
+
+        fetch(`${API_BASE}/admin/certificate-requests`, {
+          credentials: "include",
+        }).catch(() => null),
+      ]);
+
+      let employees = 0;
+      let certificates = 0;
+      let pendingRequests = 0;
+
+      /*
+      ==========================================================
+      EMPLOYEES
+      ==========================================================
+      */
+
+      if (employeesResponse?.ok) {
+        const data = await employeesResponse
+          .json()
+          .catch(() => ({}));
+
+        const employeeList =
+          data?.employees ||
+          data?.data ||
+          [];
+
+        employees = Array.isArray(employeeList)
+          ? employeeList.length
+          : Number(data?.count || 0);
+      }
+
+      /*
+      ==========================================================
+      CERTIFICATES
+      ==========================================================
+      */
+
+      if (certificatesResponse?.ok) {
+        const data = await certificatesResponse
+          .json()
+          .catch(() => ({}));
+
+        const certificateList =
+          data?.certificates ||
+          data?.data ||
+          [];
+
+        certificates = Array.isArray(certificateList)
+          ? certificateList.length
+          : Number(data?.count || 0);
+      }
+
+      /*
+      ==========================================================
+      CERTIFICATE REQUESTS
+      ==========================================================
+      */
+
+      if (requestsResponse?.ok) {
+        const data = await requestsResponse
+          .json()
+          .catch(() => ({}));
+
+        const requestList =
+          data?.requests ||
+          data?.data ||
+          [];
+
+        if (Array.isArray(requestList)) {
+          pendingRequests = requestList.filter(
+            (item) =>
+              String(item?.status).toLowerCase() ===
+              "pending"
+          ).length;
+        }
+      }
+
+      /*
+      ==========================================================
+      UPDATE ONLY DASHBOARD STATISTICS
+      ==========================================================
+      */
+
+      setStats((prev) => ({
+        ...prev,
+        employees,
+        certificates,
+        pendingRequests,
+      }));
+    } catch (error) {
+      console.error(
+        "Dashboard statistics error:",
+        error
       );
+    }
+  }
+
+  /*
+  ============================================================
+  LOGOUT
+  ============================================================
+  */
+
+  async function handleLogout() {
+    try {
+      setLoggingOut(true);
+
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      navigate("/admin/login", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+
+      navigate("/admin/login", {
+        replace: true,
+      });
     } finally {
       setLoggingOut(false);
     }
   }
 
-  // =========================================================
-  // ADMIN CARDS
-  // =========================================================
+  /*
+  ============================================================
+  MARK ALL ADMIN NOTIFICATIONS AS READ
+  ============================================================
+  */
 
-  const cards = [
-    {
-      title: "Certificates",
-      description: "View and manage certificate records.",
-      icon: FileBadge,
-      link: "/admin/certificates",
-    },
-    {
-      title: "Issue Certificate",
-      description: "Create a new certificate record.",
-      icon: PlusCircle,
-      link: "/admin/certificates/new",
-    },
-    {
-      title: "Employees",
-      description: "Employee management workspace.",
-      icon: Users,
-      link: "/admin/employees",
-    },
-  ];
+  async function handleMarkAllNotificationsRead() {
+    try {
+      console.log("Mark all read clicked");
 
-  // =========================================================
-  // LOADING
-  // =========================================================
+      const response = await fetch(
+        `${API_BASE}/admin/notifications/read-all`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response
+        .json()
+        .catch(() => ({}));
+
+      console.log(
+        "Mark all read response:",
+        response.status,
+        data
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            "Failed to mark notifications as read."
+        );
+      }
+
+      setNotifications((prev) =>
+        prev.map((item) => ({
+          ...item,
+          is_read: true,
+        }))
+      );
+
+      setStats((prev) => ({
+        ...prev,
+        notifications: 0,
+      }));
+    } catch (error) {
+      console.error(
+        "Mark all notifications error:",
+        error
+      );
+    }
+  }
+
+  /*
+  ============================================================
+  LOADING
+  ============================================================
+  */
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-        <div className="text-center">
-
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-500/10">
-            <ShieldCheck
-              size={38}
-              className="text-violet-300"
-            />
-          </div>
-
-          <p className="mt-5 text-lg font-semibold">
-            Loading Admin Dashboard...
-          </p>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Verifying administrator session
-          </p>
-
+      <main className="admin-loading">
+        <div className="admin-loader">
+          <div className="admin-loader-ring" />
+          <ShieldCheck size={28} />
         </div>
+
+        <p>Loading administration panel...</p>
       </main>
     );
   }
-
-  // =========================================================
-  // AUTHENTICATION FAILED
-  // =========================================================
-
-  if (!admin) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-
-        <div className="w-full max-w-md rounded-2xl border border-red-500/20 bg-slate-900 p-8 text-center">
-
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
-            <ShieldCheck size={30} />
-          </div>
-
-          <h1 className="mt-5 text-2xl font-bold">
-            Admin Authentication Required
-          </h1>
-
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Your administrator session is missing or has expired.
-            Please log in again.
-          </p>
-
-          {error && (
-            <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={() => navigate("/admin/login", {
-              replace: true,
-            })}
-            className="
-              mt-6
-              w-full
-              rounded-xl
-              bg-violet-500
-              px-5
-              py-3
-              text-sm
-              font-semibold
-              text-white
-              transition
-              hover:bg-violet-400
-            "
-          >
-            Go to Admin Login
-          </button>
-
-        </div>
-
-      </main>
-    );
-  }
-
-  // =========================================================
-  // DASHBOARD
-  // =========================================================
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-8">
+    <main className="admin-dashboard">
 
-      <div className="mx-auto max-w-7xl">
+      {/* =========================
+          BACKGROUND EFFECTS
+      ========================= */}
 
-        {/* ================= HEADER ================= */}
+      <div className="admin-background">
+        <div className="admin-orb admin-orb-purple" />
+        <div className="admin-orb admin-orb-blue" />
+        <div className="admin-grid" />
+      </div>
 
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-6">
+      {/* =========================
+          HEADER
+      ========================= */}
 
-          <div className="flex items-center gap-3">
+      <header className="admin-header">
+        <div className="admin-header-inner">
 
-            <div className="rounded-xl border border-violet-400/10 bg-violet-500/10 p-3 text-violet-300">
-              <ShieldCheck size={30} />
+          <Link
+            to="/admin"
+            className="admin-brand"
+          >
+            <div className="admin-brand-logo">
+              <ShieldCheck size={24} />
             </div>
 
             <div>
-              <h1 className="text-2xl font-bold">
-                CertiVerify Admin
+              <h1 className="admin-brand-name">
+                ESPARKS
               </h1>
 
-              <p className="mt-1 text-sm text-slate-400">
-                Certificate administration
-              </p>
+              <span>
+                IT SOLUTIONS
+              </span>
+            </div>
+          </Link>
+
+          <div className="admin-header-right">
+
+            <div className="admin-secure-status">
+
+              {/* =========================
+                  NOTIFICATIONS
+              ========================= */}
+
+              <div className="admin-notification-wrapper">
+
+                <button
+                  type="button"
+                  className="admin-notification-button"
+                  onClick={() =>
+                    setNotificationOpen(
+                      (prev) => !prev
+                    )
+                  }
+                  aria-label="Notifications"
+                >
+                  <Bell size={20} />
+
+                  {stats.notifications > 0 && (
+                    <span className="admin-notification-badge">
+                      {stats.notifications > 99
+                        ? "99+"
+                        : stats.notifications}
+                    </span>
+                  )}
+                </button>
+
+                {notificationOpen && (
+                  <div className="admin-notification-dropdown">
+
+                    {/* =========================
+                        NOTIFICATION HEADER
+                    ========================= */}
+
+                    <div className="admin-notification-header">
+
+                      <div>
+                        <strong>
+                          Notifications
+                        </strong>
+
+                        <span>
+                          {stats.notifications} unread
+                        </span>
+                      </div>
+
+                      {stats.notifications > 0 && (
+                        <button
+                          type="button"
+                          onClick={
+                            handleMarkAllNotificationsRead
+                          }
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    {/* =========================
+                        NOTIFICATION LIST
+                    ========================= */}
+
+                    <div className="admin-notification-list">
+
+                      {notifications.length === 0 ? (
+                        <div className="admin-no-notifications">
+                          <Bell size={24} />
+
+                          <p>
+                            No notifications
+                          </p>
+                        </div>
+                      ) : (
+                        notifications
+                          .slice(0, 10)
+                          .map((notification) => (
+                            <button
+                              type="button"
+                              key={notification.id}
+                              className={`admin-notification-item ${
+                                notification.is_read
+                                  ? ""
+                                  : "unread"
+                              }`}
+                              onClick={async () => {
+                                try {
+                                  if (
+                                    !notification.is_read
+                                  ) {
+                                    await markAdminNotificationAsRead(
+                                      notification.id
+                                    );
+
+                                    setNotifications(
+                                      (prev) =>
+                                        prev.map(
+                                          (item) =>
+                                            item.id ===
+                                            notification.id
+                                              ? {
+                                                  ...item,
+                                                  is_read:
+                                                    true,
+                                                }
+                                              : item
+                                        )
+                                    );
+
+                                    setStats(
+                                      (prev) => ({
+                                        ...prev,
+                                        notifications:
+                                          Math.max(
+                                            0,
+                                            prev.notifications -
+                                              1
+                                          ),
+                                      })
+                                    );
+                                  }
+
+                                  if (
+                                    notification.certificate_request_id
+                                  ) {
+                                    navigate(
+                                      `/admin/certificates/create?requestId=${encodeURIComponent(
+                                        notification.certificate_request_id
+                                      )}`
+                                    );
+
+                                    setNotificationOpen(
+                                      false
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error(
+                                    "Notification click error:",
+                                    error
+                                  );
+                                }
+                              }}
+                            >
+
+                              <div className="admin-notification-icon">
+                                <Bell size={17} />
+                              </div>
+
+                              <div className="admin-notification-content">
+
+                                <strong>
+                                  {notification.title}
+                                </strong>
+
+                                <p>
+                                  {notification.message}
+                                </p>
+
+                                <small>
+                                  {new Date(
+                                    notification.created_at
+                                  ).toLocaleString()}
+                                </small>
+
+                              </div>
+
+                              {!notification.is_read && (
+                                <span className="admin-notification-dot" />
+                              )}
+
+                            </button>
+                          ))
+                      )}
+
+                    </div>
+
+                    {/* =========================
+                        NOTIFICATION FOOTER
+                    ========================= */}
+
+                    <button
+                      type="button"
+                      className="admin-notification-footer"
+                      onClick={() => {
+                        setNotificationOpen(false);
+
+                        navigate(
+                          "/admin/certificate-requests"
+                        );
+                      }}
+                    >
+                      View Certificate Requests
+
+                      <ArrowRight size={15} />
+                    </button>
+
+                  </div>
+                )}
+
+              </div>
+
+              <span className="secure-dot" />
+
+              Secure Session
+            </div>
+
+            {/* =========================
+                ADMIN USER
+            ========================= */}
+
+            <div className="admin-user">
+
+              <div className="admin-user-avatar">
+                {admin?.email
+                  ?.charAt(0)
+                  ?.toUpperCase() || "A"}
+              </div>
+
+              <div className="admin-user-info">
+
+                <strong>
+                  Administrator
+                </strong>
+
+                <span>
+                  {admin?.email || "Admin"}
+                </span>
+
+              </div>
+            </div>
+
+            {/* =========================
+                LOGOUT
+            ========================= */}
+
+            <button
+              type="button"
+              className="admin-logout"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              <LogOut size={17} />
+
+              {loggingOut
+                ? "Logging out..."
+                : "Logout"}
+            </button>
+
+          </div>
+        </div>
+      </header>
+
+      {/* =========================
+          MAIN
+      ========================= */}
+
+      <section className="admin-main">
+
+        {/* =========================
+            HERO
+        ========================= */}
+
+        <div className="admin-hero">
+
+          <div className="admin-hero-content">
+
+            <div className="admin-eyebrow">
+              <LayoutDashboard size={15} />
+
+              ADMINISTRATION PANEL
+            </div>
+
+            <h2>
+              Certificate
+              <span> Administration </span>
+              Made Simple.
+            </h2>
+
+            <p>
+              Manage employees, certificates and
+              certificate requests from one secure
+              administration workspace.
+            </p>
+
+            <div className="admin-hero-actions">
+
+              <Link
+                to="/admin/certificates/new"
+                className="admin-primary-button"
+              >
+                <FilePlus2 size={18} />
+
+                Issue Certificate
+
+                <ArrowRight size={17} />
+              </Link>
+
+              <Link
+                to="/admin/certificate-requests"
+                className="admin-secondary-button"
+              >
+                <Bell size={18} />
+
+                Certificate Requests
+
+                {stats.pendingRequests > 0 && (
+                  <span className="request-badge">
+                    {stats.pendingRequests}
+                  </span>
+                )}
+              </Link>
+
+            </div>
+          </div>
+
+          {/* =========================
+              HERO VISUAL
+          ========================= */}
+
+          <div className="admin-hero-visual">
+
+            <div className="hero-ring hero-ring-one" />
+
+            <div className="hero-ring hero-ring-two" />
+
+            <div className="hero-shield">
+              <ShieldCheck size={58} />
+            </div>
+
+            <div className="hero-floating-card hero-card-one">
+              <CheckCircle2 size={17} />
+              <span>Verified</span>
+            </div>
+
+            <div className="hero-floating-card hero-card-two">
+              <LockKeyhole size={17} />
+              <span>Protected</span>
             </div>
 
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="
-              flex
-              items-center
-              gap-2
-              rounded-xl
-              border
-              border-slate-700
-              px-4
-              py-2.5
-              text-sm
-              font-medium
-              transition
-              hover:border-red-400
-              hover:bg-red-500/10
-              hover:text-red-300
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-            "
-          >
-            <LogOut size={17} />
+        </div>
 
-            {loggingOut
-              ? "Logging out..."
-              : "Logout"}
-          </button>
+        {/* =========================
+            STATS
+        ========================= */}
 
-        </header>
+        <section className="admin-stats">
 
-        {/* ================= WELCOME ================= */}
+          <div className="admin-stat-card">
 
-        <section className="py-10">
+            <div className="stat-icon purple">
+              <Users size={22} />
+            </div>
 
-          <p className="text-sm font-semibold tracking-wide text-violet-300">
-            ADMINISTRATOR WORKSPACE
-          </p>
+            <div className="stat-content">
 
-          <h2 className="mt-2 text-3xl font-bold sm:text-4xl">
-            Welcome back
-          </h2>
+              <span>
+                Total Employees
+              </span>
 
-          <p className="mt-2 text-sm text-slate-500">
-            {admin.email}
-          </p>
+              <strong>
+                {stats.employees}
+              </strong>
 
-          <p className="mt-3 max-w-2xl text-slate-400">
-            Manage certificates, employees, and
-            certificate verification from your
-            administration workspace.
-          </p>
+              <small>
+                Registered employees
+              </small>
 
-        </section>
+            </div>
+          </div>
 
-        {/* ================= CARDS ================= */}
+          <div className="admin-stat-card">
 
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="stat-icon blue">
+              <Award size={22} />
+            </div>
 
-          {cards.map(
-            ({
-              title,
-              description,
-              icon: Icon,
-              link,
-            }) => (
-              <Link
-                key={title}
-                to={link}
-                className="
-                  group
-                  rounded-2xl
-                  border
-                  border-slate-800
-                  bg-slate-900
-                  p-6
-                  transition-all
-                  duration-200
-                  hover:-translate-y-1
-                  hover:border-violet-400/50
-                  hover:bg-slate-900/80
-                  hover:shadow-xl
-                  hover:shadow-violet-950/20
-                "
-              >
+            <div className="stat-content">
 
-                <div
-                  className="
-                    flex
-                    h-12
-                    w-12
-                    items-center
-                    justify-center
-                    rounded-xl
-                    bg-violet-500/10
-                    text-violet-300
-                    transition
-                    group-hover:bg-violet-500/20
-                  "
-                >
-                  <Icon size={27} />
-                </div>
+              <span>
+                Certificates
+              </span>
 
-                <h3 className="mt-5 text-lg font-semibold">
-                  {title}
-                </h3>
+              <strong>
+                {stats.certificates}
+              </strong>
 
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  {description}
-                </p>
+              <small>
+                Issued certificates
+              </small>
 
-                <span
-                  className="
-                    mt-5
-                    inline-block
-                    text-sm
-                    font-medium
-                    text-violet-300
-                    transition
-                    group-hover:text-violet-200
-                  "
-                >
-                  Open workspace →
-                </span>
+            </div>
+          </div>
 
-              </Link>
-            )
-          )}
+          <div className="admin-stat-card">
+
+            <div className="stat-icon cyan">
+              <Clock3 size={22} />
+            </div>
+
+            <div className="stat-content">
+
+              <span>
+                Pending Requests
+              </span>
+
+              <strong>
+                {stats.pendingRequests}
+              </strong>
+
+              <small>
+                Waiting for review
+              </small>
+
+            </div>
+          </div>
+
+          <div className="admin-stat-card">
+
+            <div className="stat-icon pink">
+              <Bell size={22} />
+            </div>
+
+            <div className="stat-content">
+
+              <span>
+                Notifications
+              </span>
+
+              <strong>
+                {stats.notifications}
+              </strong>
+
+              <small>
+                Unread notifications
+              </small>
+
+            </div>
+          </div>
 
         </section>
 
-        {/* ================= ADMIN INFO ================= */}
+        {/* =========================
+            ERROR
+        ========================= */}
 
-        <section
-          className="
-            mt-8
-            rounded-2xl
-            border
-            border-slate-800
-            bg-slate-900/50
-            p-5
-          "
-        >
+        {error && (
+          <div className="admin-error">
 
-          <div className="flex items-start gap-3">
+            <XCircle size={18} />
 
-            <ShieldCheck
-              size={20}
-              className="mt-0.5 shrink-0 text-violet-300"
-            />
+            {error}
+
+          </div>
+        )}
+
+        {/* =========================
+            WORKSPACE
+        ========================= */}
+
+        <section className="admin-workspace-section">
+
+          <div className="section-heading">
 
             <div>
 
-              <h3 className="text-sm font-semibold text-slate-200">
-                Administrator Access
+              <span className="section-label">
+                WORKSPACE
+              </span>
+
+              <h3>
+                Administration Tools
               </h3>
 
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                Signed in as{" "}
-                <span className="text-slate-300">
-                  {admin.email}
-                </span>
-                . Certificate and employee management
-                actions are available from the workspaces
-                above.
+              <p>
+                Access the main areas of your
+                certificate management system.
               </p>
 
             </div>
 
           </div>
 
+          <div className="workspace-grid">
+
+            {/* =========================
+                CERTIFICATES
+            ========================= */}
+
+            <Link
+              to="/admin/certificates"
+              className="workspace-card workspace-purple"
+            >
+
+              <div className="workspace-top">
+
+                <div className="workspace-icon">
+                  <Award size={24} />
+                </div>
+
+                <ChevronRight
+                  size={20}
+                  className="workspace-arrow"
+                />
+
+              </div>
+
+              <h4>
+                Certificates
+              </h4>
+
+              <p>
+                View, search, edit and manage
+                issued certificates.
+              </p>
+
+              <span className="workspace-link">
+
+                Manage Certificates
+
+                <ArrowRight size={15} />
+
+              </span>
+
+            </Link>
+
+            {/* =========================
+                ISSUE CERTIFICATE
+            ========================= */}
+
+            <Link
+              to="/admin/certificates/new"
+              className="workspace-card workspace-blue"
+            >
+
+              <div className="workspace-top">
+
+                <div className="workspace-icon">
+                  <FilePlus2 size={24} />
+                </div>
+
+                <ChevronRight
+                  size={20}
+                  className="workspace-arrow"
+                />
+
+              </div>
+
+              <h4>
+                Issue Certificate
+              </h4>
+
+              <p>
+                Create and issue a new employee
+                certificate securely.
+              </p>
+
+              <span className="workspace-link">
+
+                Create Certificate
+
+                <ArrowRight size={15} />
+
+              </span>
+
+            </Link>
+
+            {/* =========================
+                CERTIFICATE REQUESTS
+            ========================= */}
+
+            <Link
+              to="/admin/certificate-requests"
+              className="workspace-card workspace-cyan"
+            >
+
+              <div className="workspace-top">
+
+                <div className="workspace-icon">
+                  <Bell size={24} />
+                </div>
+
+                <ChevronRight
+                  size={20}
+                  className="workspace-arrow"
+                />
+
+              </div>
+
+              <h4>
+                Certificate Requests
+              </h4>
+
+              <p>
+                Review employee requests and
+                issue or reject certificates.
+              </p>
+
+              <span className="workspace-link">
+
+                Review Requests
+
+                {stats.pendingRequests > 0 && (
+                  <span className="workspace-count">
+                    {stats.pendingRequests}
+                  </span>
+                )}
+
+              </span>
+
+            </Link>
+
+            {/* =========================
+                EMPLOYEES
+            ========================= */}
+
+            <Link
+              to="/admin/employees"
+              className="workspace-card workspace-pink"
+            >
+
+              <div className="workspace-top">
+
+                <div className="workspace-icon">
+                  <Users size={24} />
+                </div>
+
+                <ChevronRight
+                  size={20}
+                  className="workspace-arrow"
+                />
+
+              </div>
+
+              <h4>
+                Employees
+              </h4>
+
+              <p>
+                Manage registered eSparks IT
+                employee accounts.
+              </p>
+
+              <span className="workspace-link">
+
+                Manage Employees
+
+                <ArrowRight size={15} />
+
+              </span>
+
+            </Link>
+
+          </div>
+
         </section>
 
-      </div>
+        {/* =========================
+            SECURITY
+        ========================= */}
+
+        <section className="admin-security">
+
+          <div className="security-icon">
+            <LockKeyhole size={24} />
+          </div>
+
+          <div className="security-content">
+
+            <span className="section-label">
+              SECURITY
+            </span>
+
+            <h3>
+              Administration session protected
+            </h3>
+
+            <p>
+              Your administrator session is
+              authenticated through a secure
+              HTTP-only cookie.
+            </p>
+
+          </div>
+
+          <div className="security-status">
+            <span />
+            Authenticated
+          </div>
+
+        </section>
+
+        {/* =========================
+            FOOTER
+        ========================= */}
+
+        <footer className="admin-footer">
+
+          <div>
+
+            <ShieldCheck size={17} />
+
+            Certificate Management System
+
+          </div>
+
+          <span>
+            Secure Administration Workspace
+          </span>
+
+        </footer>
+
+      </section>
     </main>
   );
 }

@@ -1,1718 +1,1596 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 
 import {
+  Activity,
+  ArrowRight,
+  Award,
   BadgeCheck,
+  BookOpen,
+  CalendarDays,
   Check,
-  Clipboard,
+  CircleCheck,
   Copy,
   ExternalLink,
-  FileBadge,
+  FileCheck2,
+  Fingerprint,
+  LockKeyhole,
   LogOut,
   Mail,
   QrCode,
-  RefreshCw,
+  Radio,
+  ScanLine,
+  Shield,
   ShieldCheck,
+  Sparkles,
   User,
-  CalendarDays,
-  BookOpen,
-  LockKeyhole,
-  ArrowRight,
+  X,
 } from "lucide-react";
 
 import { apiRequest } from "../services/api";
+import "./EmployeeDashboard.css";
 
+/* =========================================================
+   HELPERS
+========================================================= */
 
-// =========================================================
-// NORMALIZE CERTIFICATE
-// Backend may return snake_case.
-// Frontend uses camelCase.
-// =========================================================
+function getEmployeeId(employee) {
+  if (!employee) return "";
 
-function normalizeCertificate(raw = {}) {
+  return String(
+    employee.employee_id ??
+      employee.employeeId ??
+      employee.id ??
+      ""
+  ).trim();
+}
+
+function getCertificateEmployeeId(data) {
+  if (!data) return "";
+
+  return String(
+    data.employeeId ??
+      data.employee_id ??
+      data.employee?.id ??
+      data.employee?.employee_id ??
+      data.employee?.employeeId ??
+      ""
+  ).trim();
+}
+
+function normalizeCertificate(data) {
+  if (!data) return null;
+
+  const verificationToken =
+    data.verificationToken ??
+    data.verification_token ??
+    "";
+
+  const employeeId =
+    getCertificateEmployeeId(data);
+
+  const certificateUrl = verificationToken
+    ? `${window.location.origin}/certificate/view?token=${encodeURIComponent(
+        verificationToken
+      )}`
+    : "";
+
   return {
-    id: raw.id ?? null,
+    id: data.id,
+
+    employeeId,
 
     certificateNo:
-      raw.certificateNo ??
-      raw.certificate_no ??
+      data.certificateNo ??
+      data.certificate_no ??
+      data.certificateNumber ??
+      data.certificate_number ??
       "",
 
     recipientName:
-      raw.recipientName ??
-      raw.recipient_name ??
+      data.recipientName ??
+      data.recipient_name ??
       "",
 
     courseName:
-      raw.courseName ??
-      raw.course_name ??
+      data.courseName ??
+      data.course_name ??
       "",
 
     issuerName:
-      raw.issuerName ??
-      raw.issuer_name ??
+      data.issuerName ??
+      data.issuer_name ??
       "",
 
     issueDate:
-      raw.issueDate ??
-      raw.issue_date ??
+      data.issueDate ??
+      data.issue_date ??
       "",
 
-    verificationToken:
-      raw.verificationToken ??
-      raw.verification_token ??
-      "",
+    status: String(
+      data.status ?? ""
+    ).toLowerCase(),
 
-    status:
-      raw.status ??
-      "issued",
+    verificationToken,
 
-    createdAt:
-      raw.createdAt ??
-      raw.created_at ??
-      "",
+    verificationUrl: certificateUrl,
 
-    revokedAt:
-      raw.revokedAt ??
-      raw.revoked_at ??
+    certificateType:
+      data.certificateType ??
+      data.certificate_type ??
       "",
   };
 }
 
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function isIssued(certificate) {
+  return (
+    certificate &&
+    String(certificate.status).toLowerCase() ===
+      "issued"
+  );
+}
+
+/* =========================================================
+   STATUS PILL
+========================================================= */
+
+function StatusPill({
+  children,
+  icon: Icon = CircleCheck,
+  tone = "cyan",
+}) {
+  return (
+    <div
+      className={`ed-status-pill ed-status-${tone}`}
+    >
+      <span className="ed-status-dot">
+        <span className="ed-status-dot-core" />
+      </span>
+
+      <Icon size={11} />
+
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/* =========================================================
+   CERTIFICATE DETAIL
+========================================================= */
+
+function CertificateDetail({
+  icon: Icon,
+  label,
+  value,
+  mono = false,
+}) {
+  return (
+    <div className="ed-detail-card">
+      <div className="ed-detail-line" />
+
+      <div className="ed-detail-content">
+        <div className="ed-detail-icon">
+          <Icon
+            size={16}
+            strokeWidth={1.8}
+          />
+        </div>
+
+        <div className="ed-detail-text">
+          <p className="ed-detail-label">
+            {label}
+          </p>
+
+          <p
+            className={`ed-detail-value ${
+              mono
+                ? "ed-detail-mono"
+                : ""
+            }`}
+          >
+            {value || "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   EMPTY CERTIFICATES
+========================================================= */
+
+function EmptyCertificates({
+  onRequest,
+}) {
+  return (
+    <div className="ed-empty-card">
+      <div className="ed-empty-glow" />
+
+      <div className="ed-empty-icon">
+        <Award
+          size={38}
+          strokeWidth={1.2}
+        />
+      </div>
+
+      <div className="ed-empty-content">
+        <p className="ed-section-eyebrow">
+          Digital credentials
+        </p>
+
+        <h2>No certificates yet</h2>
+
+        <p>
+          You currently don't have an issued
+          certificate associated with your
+          employee account.
+        </p>
+
+        <button
+          type="button"
+          onClick={onRequest}
+          className="ed-primary-button"
+        >
+          Request Certificate
+          <ArrowRight size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PENDING REQUEST
+========================================================= */
+
+function PendingRequestCard({
+  request,
+}) {
+  const courseName =
+    request?.courseName ??
+    request?.course_name ??
+    "Certificate request";
+
+  const certificateType =
+    request?.certificateType ??
+    request?.certificate_type ??
+    "CERT";
+
+  const createdAt =
+    request?.createdAt ??
+    request?.created_at;
+
+  return (
+    <div className="ed-pending-card">
+      <div>
+        <div className="ed-pending-heading">
+          <p>{courseName}</p>
+
+          <span>{certificateType}</span>
+        </div>
+
+        <p className="ed-pending-date">
+          Submitted{" "}
+          {createdAt
+            ? formatDate(createdAt)
+            : "recently"}
+        </p>
+      </div>
+
+      <StatusPill
+        icon={Activity}
+        tone="amber"
+      >
+        Pending review
+      </StatusPill>
+    </div>
+  );
+}
+
+/* =========================================================
+   QR MODAL
+========================================================= */
+
+function QRModal({
+  certificate,
+  onClose,
+  onViewCertificate,
+}) {
+  if (!certificate) return null;
+
+  const certificateUrl =
+    certificate.verificationUrl;
+
+  return (
+    <div
+      className="ed-modal-backdrop"
+      onMouseDown={(event) => {
+        if (
+          event.target ===
+          event.currentTarget
+        ) {
+          onClose();
+        }
+      }}
+    >
+      <div className="ed-qr-modal">
+        <div className="ed-modal-top-line" />
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="ed-modal-close"
+          aria-label="Close QR"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="ed-qr-modal-content">
+          <div className="ed-qr-heading">
+            <div className="ed-qr-heading-icon">
+              <QrCode size={22} />
+            </div>
+
+            <p className="ed-section-eyebrow">
+              Secure certificate access
+            </p>
+
+            <h2>
+              {certificate.certificateNo ||
+                "Certificate"}
+            </h2>
+
+            <p>
+              Scan this QR to open your full
+              certificate.
+            </p>
+          </div>
+
+          <div className="ed-qr-container">
+            <div className="ed-qr-box">
+              {certificateUrl ? (
+                <QRCodeSVG
+                  value={certificateUrl}
+                  size={245}
+                  level="H"
+                  includeMargin
+                  bgColor="#ffffff"
+                  fgColor="#031014"
+                />
+              ) : (
+                <div
+                  style={{
+                    padding: "30px",
+                    textAlign: "center",
+                  }}
+                >
+                  QR unavailable
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="ed-qr-info">
+            <p className="ed-detail-label">
+              Certificate
+            </p>
+
+            <p className="ed-qr-course">
+              {certificate.courseName ||
+                "Certificate credential"}
+            </p>
+
+            <p className="ed-qr-description">
+              Scan this QR to open the full
+              certificate. Access is protected by
+              employee authentication and
+              certificate ownership checks.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onViewCertificate(
+                certificate
+              );
+            }}
+            className="ed-primary-button ed-full-button"
+          >
+            <ExternalLink size={16} />
+
+            Open Full Certificate
+
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   MAIN DASHBOARD
+========================================================= */
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
 
-  // =========================================================
-  // STATE
-  // =========================================================
-
   const [employee, setEmployee] =
     useState(null);
 
-  const [certificate, setCertificate] =
-    useState(null);
+  const [certificates, setCertificates] =
+    useState([]);
 
-  const [verificationUrl, setVerificationUrl] =
-    useState("");
+  const [pendingRequests, setPendingRequests] =
+    useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [qrLoading, setQrLoading] =
-    useState(false);
-
-  const [qrGenerated, setQrGenerated] =
-    useState(false);
-
-  const [copied, setCopied] =
-    useState(false);
-
+  /*
+   * No full-page loading state.
+   * The dashboard renders immediately.
+   */
   const [error, setError] =
     useState("");
 
+  const [
+    selectedCertificate,
+    setSelectedCertificate,
+  ] = useState(null);
 
-  // =========================================================
-  // LOAD EMPLOYEE + EXISTING QR
-  // =========================================================
+  const [copiedId, setCopiedId] =
+    useState(null);
+
+  /* =======================================================
+     LOAD DASHBOARD
+  ====================================================== */
 
   useEffect(() => {
-    loadEmployee();
+    loadDashboard();
   }, []);
 
+  async function loadDashboard() {
+    setError("");
 
-  async function loadEmployee() {
     try {
-      setLoading(true);
-      setError("");
+      /* ---------------------------------------------------
+         EMPLOYEE
+      --------------------------------------------------- */
 
-      // -------------------------------------------------------
-      // GET CURRENT EMPLOYEE
-      // -------------------------------------------------------
-
-      const employeeData =
+      const employeeResult =
         await apiRequest(
-          "/employee-auth/me",
-          {
-            method: "GET",
-          }
+          "/employee-auth/me"
         );
 
-      console.log(
-        "========== EMPLOYEE DEBUG =========="
-      );
+      const currentEmployee =
+        employeeResult?.employee ??
+        employeeResult?.user ??
+        employeeResult;
 
-      console.log(
-        "EMPLOYEE DATA:",
-        employeeData
-      );
-
-      console.log(
-        "EMPLOYEE OBJECT:",
-        employeeData?.employee
-      );
-
-      console.log(
-        "EMPLOYEE NAME:",
-        employeeData?.employee?.name
-      );
-
-      console.log(
-        "EMPLOYEE EMAIL:",
-        employeeData?.employee?.email
-      );
-
-      console.log(
-        "===================================="
-      );
-
-
-      // -------------------------------------------------------
-      // EMPLOYEE NOT FOUND
-      // -------------------------------------------------------
-
-      if (!employeeData?.employee) {
+      if (!currentEmployee) {
         throw new Error(
-          "Employee information was not returned."
+          "Employee account could not be loaded."
         );
       }
 
+      setEmployee(currentEmployee);
 
-      // -------------------------------------------------------
-      // SAVE EMPLOYEE
-      // -------------------------------------------------------
+      const loggedInEmployeeId =
+        getEmployeeId(
+          currentEmployee
+        );
 
-      setEmployee(
-        employeeData.employee
+      /* ---------------------------------------------------
+         CERTIFICATES
+      --------------------------------------------------- */
+
+      const certificateResult =
+        await apiRequest(
+          "/employee/certificates"
+        );
+
+      const rawCertificates =
+        certificateResult?.certificates ??
+        certificateResult?.data ??
+        [];
+
+      const normalizedCertificates =
+        Array.isArray(
+          rawCertificates
+        )
+          ? rawCertificates
+              .map(
+                normalizeCertificate
+              )
+              .filter(Boolean)
+          : [];
+
+      /*
+       * IMPORTANT:
+       *
+       * Never hardcode employee 5.
+       *
+       * If the backend supplies employee_id,
+       * only show certificates belonging to
+       * the currently authenticated employee.
+       *
+       * If employee_id is not returned, the
+       * backend MUST already guarantee that
+       * /employee/certificates contains only
+       * the authenticated employee's records.
+       */
+      const employeeCertificates =
+        loggedInEmployeeId
+          ? normalizedCertificates.filter(
+              (certificate) => {
+                /*
+                 * If certificate has an employee ID,
+                 * enforce the match.
+                 */
+                if (
+                  certificate.employeeId
+                ) {
+                  return (
+                    String(
+                      certificate.employeeId
+                    ) ===
+                    loggedInEmployeeId
+                  );
+                }
+
+                /*
+                 * If employee_id is not included
+                 * in the response, keep the
+                 * certificate because this endpoint
+                 * is expected to already be scoped
+                 * by the backend.
+                 */
+                return true;
+              }
+            )
+          : [];
+
+      setCertificates(
+        employeeCertificates
       );
 
-
-      // -------------------------------------------------------
-      // CHECK EXISTING QR
-      // -------------------------------------------------------
+      /* ---------------------------------------------------
+         REQUESTS
+      --------------------------------------------------- */
 
       try {
-        const qrData =
+        const requestResult =
           await apiRequest(
-            "/employee/qr",
-            {
-              method: "GET",
-            }
+            "/employee/certificate-requests"
           );
 
-        console.log(
-          "EXISTING QR DATA:",
-          qrData
-        );
+        const requests =
+          requestResult?.requests ??
+          requestResult?.data ??
+          [];
 
-
-        // -----------------------------------------------------
-        // BACKEND MAY RETURN verificationUrl OR url
-        // -----------------------------------------------------
-
-        const existingVerificationUrl =
-          qrData?.verificationUrl ||
-          qrData?.url;
-
-
-        // -----------------------------------------------------
-        // EXISTING QR FOUND
-        // -----------------------------------------------------
-
-        if (existingVerificationUrl) {
-
-          setVerificationUrl(
-            existingVerificationUrl
-          );
-
-
-          // ---------------------------------------------------
-          // LOAD CERTIFICATE
-          // ---------------------------------------------------
-
-          if (qrData?.certificate) {
-            setCertificate(
-              normalizeCertificate(
-                qrData.certificate
+        const pending =
+          Array.isArray(requests)
+            ? requests.filter(
+                (request) =>
+                  String(
+                    request?.status ??
+                      ""
+                  ).toLowerCase() ===
+                  "pending"
               )
-            );
-          }
+            : [];
 
-
-          // ---------------------------------------------------
-          // SHOW QR
-          // ---------------------------------------------------
-
-          setQrGenerated(true);
-        }
-
-      } catch (qrError) {
-
-        /*
-         * Employee may not have generated
-         * QR yet.
-         *
-         * Do NOT redirect to login.
-         */
-
-        console.log(
-          "No existing QR:",
-          qrError?.message
+        setPendingRequests(
+          pending
         );
+      } catch (requestError) {
+        console.warn(
+          "Certificate requests unavailable:",
+          requestError
+        );
+
+        setPendingRequests([]);
       }
-
-    } catch (error) {
-
-      console.error(
-        "Employee dashboard error:",
-        error
-      );
-
-
-      // -------------------------------------------------------
-      // AUTHENTICATION ERROR
-      // -------------------------------------------------------
-
+    } catch (err) {
       if (
-        error?.status === 401 ||
-        error?.status === 403
+        err?.status === 401 ||
+        err?.status === 403 ||
+        err?.response?.status ===
+          401 ||
+        err?.response?.status ===
+          403
       ) {
-        navigate(
-          "/login",
-          {
-            replace: true,
-          }
-        );
+        navigate("/login", {
+          replace: true,
+        });
 
         return;
       }
 
-
-      // -------------------------------------------------------
-      // OTHER ERROR
-      // -------------------------------------------------------
-
       setError(
-        error?.message ||
-          "Unable to load employee dashboard."
+        err?.message ||
+          "Unable to load your employee dashboard."
       );
-
-    } finally {
-
-      setLoading(false);
     }
   }
 
+  /* =======================================================
+     OPEN FULL CERTIFICATE
+  ====================================================== */
 
-  // =========================================================
-  // GENERATE QR
-  // =========================================================
-
-  async function generateQR() {
-    try {
-
-      setQrLoading(true);
-      setError("");
-      setCopied(false);
-
-
-      const data =
-        await apiRequest(
-          "/employee/qr",
-          {
-            method: "POST",
-          }
-        );
-
-
-      console.log(
-        "QR RESPONSE:",
-        data
-      );
-
-
-      // -------------------------------------------------------
-      // VERIFICATION URL
-      // -------------------------------------------------------
-
-      const newVerificationUrl =
-        data?.verificationUrl ||
-        data?.url;
-
-
-      if (!newVerificationUrl) {
-
-        console.error(
-          "QR response does not contain URL:",
-          data
-        );
-
-        throw new Error(
-          "Verification URL was not returned."
-        );
-      }
-
-
-      // -------------------------------------------------------
-      // SAVE VERIFICATION URL
-      // -------------------------------------------------------
-
-      setVerificationUrl(
-        newVerificationUrl
-      );
-
-
-      // -------------------------------------------------------
-      // SAVE CERTIFICATE
-      // -------------------------------------------------------
-
-      if (data?.certificate) {
-
-        setCertificate(
-          normalizeCertificate(
-            data.certificate
-          )
-        );
-      }
-
-
-      // -------------------------------------------------------
-      // SHOW QR
-      // -------------------------------------------------------
-
-      setQrGenerated(true);
-
-    } catch (error) {
-
-      console.error(
-        "Generate QR error:",
-        error
-      );
-
-
+  function viewCertificate(
+    certificate
+  ) {
+    if (!certificate) {
       setError(
-        error?.message ||
-          "Something went wrong while generating the QR code."
-      );
-
-    } finally {
-
-      setQrLoading(false);
-    }
-  }
-
-
-  // =========================================================
-  // VERIFY CERTIFICATE
-  // =========================================================
-
-  function verifyCertificate() {
-
-    if (!verificationUrl) {
-
-      setError(
-        "Verification link is not available."
+        "Certificate information is unavailable."
       );
 
       return;
     }
-
-
-    try {
-
-      const url =
-        new URL(
-          verificationUrl
-        );
-
-
-      const token =
-        url.searchParams.get(
-          "token"
-        );
-
-
-      if (!token) {
-
-        setError(
-          "Verification token is missing."
-        );
-
-        return;
-      }
-
-
-      console.log(
-        "NAVIGATING TO VERIFY WITH TOKEN"
-      );
-
-
-      navigate(
-        `/verify?token=${encodeURIComponent(
-          token
-        )}`
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Verification navigation error:",
-        error
-      );
-
-
-      setError(
-        "Invalid verification URL."
-      );
-    }
-  }
-
-
-  // =========================================================
-  // VIEW CERTIFICATE DIRECTLY
-  // =========================================================
-
-  function viewCertificate() {
-
-    if (!verificationUrl) {
-
-      setError(
-        "Verification link is not available."
-      );
-
-      return;
-    }
-
-
-    try {
-
-      const url =
-        new URL(
-          verificationUrl
-        );
-
-
-      const token =
-        url.searchParams.get(
-          "token"
-        );
-
-
-      if (!token) {
-
-        setError(
-          "Verification token is missing."
-        );
-
-        return;
-      }
-
-
-      navigate(
-        `/certificate/view?token=${encodeURIComponent(
-          token
-        )}`
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Certificate navigation error:",
-        error
-      );
-
-
-      setError(
-        "Invalid certificate verification URL."
-      );
-    }
-  }
-
-
- // =========================================================
-// COPY VERIFICATION URL
-// =========================================================
-
-async function copyVerificationUrl() {
-  if (!verificationUrl) {
-    setError("Verification link is not available.");
-    return;
-  }
-
-  try {
-    // -------------------------------------------------------
-    // MODERN CLIPBOARD API
-    // Works on HTTPS / secure contexts
-    // -------------------------------------------------------
 
     if (
-      navigator.clipboard &&
-      window.isSecureContext
+      !certificate.verificationToken
     ) {
-      await navigator.clipboard.writeText(
-        verificationUrl
-      );
-    } else {
-      // -----------------------------------------------------
-      // FALLBACK
-      // Required for HTTP LAN URL:
-      // http://192.168.1.5:5174
-      // -----------------------------------------------------
-
-      const textArea =
-        document.createElement("textarea");
-
-      textArea.value =
-        verificationUrl;
-
-      textArea.style.position =
-        "fixed";
-
-      textArea.style.left =
-        "-9999px";
-
-      textArea.style.top =
-        "0";
-
-      textArea.style.width =
-        "1px";
-
-      textArea.style.height =
-        "1px";
-
-      textArea.style.opacity =
-        "0";
-
-      textArea.setAttribute(
-        "readonly",
-        ""
+      setError(
+        "Certificate verification token is unavailable."
       );
 
-      document.body.appendChild(
-        textArea
+      return;
+    }
+
+    navigate(
+      `/certificate/view?token=${encodeURIComponent(
+        certificate.verificationToken
+      )}`
+    );
+  }
+
+  /* =======================================================
+     COPY CERTIFICATE URL
+  ====================================================== */
+
+  async function copyVerificationUrl(
+    certificate
+  ) {
+    if (
+      !certificate?.verificationUrl
+    ) {
+      setError(
+        "Certificate link is unavailable."
       );
 
-      textArea.focus();
-      textArea.select();
-      textArea.setSelectionRange(
-        0,
-        textArea.value.length
-      );
+      return;
+    }
 
-      const copiedSuccessfully =
+    try {
+      if (
+        navigator.clipboard &&
+        window.isSecureContext
+      ) {
+        await navigator.clipboard.writeText(
+          certificate.verificationUrl
+        );
+      } else {
+        const textarea =
+          document.createElement(
+            "textarea"
+          );
+
+        textarea.value =
+          certificate.verificationUrl;
+
+        textarea.style.position =
+          "fixed";
+
+        textarea.style.opacity = "0";
+
+        document.body.appendChild(
+          textarea
+        );
+
+        textarea.focus();
+        textarea.select();
+
         document.execCommand(
           "copy"
         );
 
-      document.body.removeChild(
-        textArea
+        textarea.remove();
+      }
+
+      setCopiedId(
+        String(certificate.id)
       );
 
-      if (!copiedSuccessfully) {
-        throw new Error(
-          "Browser copy command failed."
-        );
-      }
+      setTimeout(() => {
+        setCopiedId(null);
+      }, 2000);
+    } catch {
+      setError(
+        "Unable to copy the certificate link."
+      );
     }
-
-    // -------------------------------------------------------
-    // SUCCESS
-    // -------------------------------------------------------
-
-    setCopied(true);
-    setError("");
-
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-
-  } catch (error) {
-    console.error(
-      "Copy verification URL error:",
-      error
-    );
-
-    setCopied(false);
-
-    setError(
-      "Unable to copy verification link. Please copy it manually."
-    );
   }
-}
-  // =========================================================
-  // LOGOUT
-  // =========================================================
+
+  /* =======================================================
+     LOGOUT
+  ====================================================== */
 
   async function logout() {
-
     try {
-
       await apiRequest(
         "/employee-auth/logout",
         {
           method: "POST",
         }
       );
-
-    } catch (error) {
-
-      console.error(
-        "Logout error:",
-        error
+    } catch (err) {
+      console.warn(
+        "Logout request failed:",
+        err
       );
-
     } finally {
-
-      navigate(
-        "/login",
-        {
-          replace: true,
-        }
-      );
+      navigate("/login", {
+        replace: true,
+      });
     }
   }
 
+  /* =======================================================
+     STATS
+  ====================================================== */
 
-  // =========================================================
-  // FORMAT DATE
-  // =========================================================
-
-  function formatDate(date) {
-
-    if (!date) {
-      return "-";
-    }
-
-
-    const parsedDate =
-      new Date(date);
-
-
-    if (
-      Number.isNaN(
-        parsedDate.getTime()
-      )
-    ) {
-      return date;
-    }
-
-
-    return parsedDate.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }
+  const issuedCertificates =
+    useMemo(
+      () =>
+        certificates.filter(
+          (certificate) =>
+            isIssued(certificate)
+        ),
+      [certificates]
     );
-  }
 
+  /* =======================================================
+     EMPLOYEE DATA
+  ====================================================== */
 
-  // =========================================================
-  // LOADING
-  // =========================================================
+  const employeeName =
+    employee?.name ||
+    employee?.full_name ||
+    employee?.employee_name ||
+    "Employee";
 
-  if (loading) {
+  const employeeEmail =
+    employee?.email ||
+    employee?.company_email ||
+    "—";
 
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070b12] px-5 text-white">
+  const employeeId =
+    employee?.employee_id ||
+    employee?.employeeId ||
+    employee?.id ||
+    "—";
 
-        <div className="pointer-events-none absolute -left-40 -top-40 h-88 w-88 rounded-full bg-cyan-500/10 blur-[100px]" />
-
-        <div className="pointer-events-none absolute -bottom-40 -right-40 h-88 w-88 rounded-full bg-blue-600/10 blur-[100px]" />
-
-        <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.07] bg-white/[0.035] p-8 text-center shadow-2xl backdrop-blur-xl">
-
-          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
-
-            <ShieldCheck
-              size={25}
-            />
-
-          </div>
-
-
-          <div className="mx-auto mb-5 h-8 w-8 animate-spin rounded-full border-[3px] border-white/10 border-t-cyan-400" />
-
-
-          <h2 className="text-lg font-bold text-white">
-            Loading Dashboard
-          </h2>
-
-
-          <p className="mt-2 text-xs text-slate-500">
-            Securing your certificate portal...
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
-
-
-  // =========================================================
-  // DASHBOARD
-  // =========================================================
+  /* =======================================================
+     UI
+  ====================================================== */
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#070b12] text-white">
+    <main className="employee-dashboard">
 
-      {/* BACKGROUND */}
+      {/* ===================================================
+          BACKGROUND
+      ==================================================== */}
 
-      <div className="pointer-events-none fixed -left-55 top-[10%] h-105 w-105 rounded-full bg-cyan-500/10 blur-[110px]" />
+      <div
+        className="ed-background"
+        aria-hidden="true"
+      >
+        <div className="ed-bg-glow ed-bg-glow-one" />
 
-      <div className="pointer-events-none fixed bottom-[5%] -right-55 h-105 w-105 rounded-full bg-blue-600/10 blur-[110px]" />
+        <div className="ed-bg-glow ed-bg-glow-two" />
 
+        <div className="ed-grid-background" />
 
-      {/* =====================================================
+        <div className="ed-top-line" />
+      </div>
+
+      {/* ===================================================
           NAVBAR
-      ===================================================== */}
+      ==================================================== */}
 
-      <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#070b12]/80 backdrop-blur-xl">
+      <header className="ed-navbar">
+        <div className="ed-navbar-inner">
 
-        <div className="mx-auto flex min-h-18 w-[calc(100%-32px)] max-w-7xl items-center justify-between">
+          <div className="ed-brand">
 
-          {/* BRAND */}
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate("/")
-            }
-            className="flex items-center gap-3"
-          >
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-400">
-
-              <ShieldCheck
-                size={21}
-              />
-
+            <div className="ed-brand-icon">
+              <div className="ed-brand-inner">
+                <Award size={19} />
+              </div>
             </div>
 
-
-            <div className="hidden text-left sm:block">
-
-              <div className="text-[16px] font-extrabold tracking-tight text-white">
-                CertiVerify
-              </div>
-
-              <div className="text-[9px] font-semibold uppercase tracking-[1px] text-slate-500">
-                Certificate Portal
-              </div>
-
-            </div>
-
-          </button>
-
-
-          {/* RIGHT */}
-
-          <div className="flex items-center gap-3">
-
-            <div className="hidden items-center gap-2.5 sm:flex">
-
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-sm font-bold text-cyan-300">
-
-                {employee?.name
-                  ?.charAt(0)
-                  ?.toUpperCase() ||
-                  "E"}
-
-              </div>
-
-
-              <div className="flex flex-col">
-
-                <span className="text-xs font-bold text-slate-200">
-                  {employee?.name ||
-                    "Employee"}
+            <div>
+              <p className="ed-brand-name">
+                ESPARKS{" "}
+                <span>
+                  IT SOLUTIONS
                 </span>
+              </p>
 
-                <span className="text-[10px] text-slate-500">
-                  Employee
-                </span>
-
-              </div>
-
-            </div>
-
-
-            <div className="hidden h-7 w-px bg-white/8 sm:block" />
-
-
-            <button
-              type="button"
-              onClick={logout}
-              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-white/8 bg-white/3 px-3 text-xs font-bold text-slate-400 transition hover:border-red-400/20 hover:bg-red-400/[0.07] hover:text-red-300"
-            >
-
-              <LogOut
-                size={16}
-              />
-
-              <span className="hidden sm:block">
-                Logout
-              </span>
-
-            </button>
-
-          </div>
-
-        </div>
-
-      </header>
-
-
-      {/* =====================================================
-          MAIN
-      ===================================================== */}
-
-      <main className="relative z-10 mx-auto w-[calc(100%-32px)] max-w-7xl py-10 sm:py-14">
-
-
-        {/* ===================================================
-            HERO
-        =================================================== */}
-
-        <section className="mb-8 flex items-end justify-between gap-8">
-
-          <div className="max-w-2xl">
-
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/6 px-3 py-1.5 text-[9px] font-extrabold tracking-[1.4px] text-cyan-300">
-
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.7)]" />
-
-              EMPLOYEE PORTAL
-
-            </div>
-
-
-            <h1 className="text-3xl font-extrabold leading-tight tracking-[-1.5px] text-white sm:text-5xl">
-
-              Welcome back,
-
-              <span className="bg-linear-to-r from-cyan-300 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
-
-                {" "}
-
-                {employee?.name ||
-                  "Employee"}
-
-              </span>
-
-              <span className="ml-2">
-                👋
-              </span>
-
-            </h1>
-
-
-            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-500 sm:text-[15px]">
-              Manage your certificate and
-              securely share its verification
-              details from one place.
-            </p>
-
-          </div>
-
-
-          <div className="hidden min-w-55 items-center gap-3 rounded-xl border border-white/[0.07] bg-white/2.5 p-3.5 lg:flex">
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-400/8 text-green-400">
-
-              <ShieldCheck
-                size={21}
-              />
-
-            </div>
-
-
-            <div className="flex flex-col gap-1">
-
-              <strong className="text-xs text-slate-200">
-                Secure Account
-              </strong>
-
-              <span className="text-[10px] text-slate-500">
-                Your session is protected
-              </span>
-
+              <p className="ed-brand-subtitle">
+                Digital Credential Network
+              </p>
             </div>
 
           </div>
 
-        </section>
+          <div className="ed-navbar-actions">
 
+            <div className="ed-session">
+              <span className="ed-session-dot" />
 
-        {/* ===================================================
-            ERROR
-        =================================================== */}
-
-        {error && (
-
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/6 px-4 py-3 text-xs text-red-300">
-
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-400/10 font-bold">
-              !
+              <span>
+                Secure session
+              </span>
             </div>
-
-
-            <span className="flex-1">
-              {error}
-            </span>
-
 
             <button
               type="button"
               onClick={() =>
-                setError("")
+                navigate("/verify")
               }
-              className="text-lg text-red-300 transition hover:text-white"
+              className="ed-scan-button"
+              title="Scan a certificate QR code"
             >
-              ×
+              <ScanLine size={15} />
+
+              <span>
+                Scan Certificate
+              </span>
             </button>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="ed-logout-button"
+            >
+              <LogOut size={15} />
+
+              <span>
+                Sign out
+              </span>
+            </button>
+
+          </div>
+
+        </div>
+      </header>
+
+      {/* ===================================================
+          CONTENT
+      ==================================================== */}
+
+      <div className="ed-content">
+
+        {/* =================================================
+            HERO
+        ================================================== */}
+
+        <section className="ed-hero">
+
+          <div className="ed-hero-glow" />
+
+          <div className="ed-hero-bottom-line" />
+
+          <div className="ed-hero-content">
+
+            <div className="ed-hero-main">
+
+              <StatusPill
+                icon={ShieldCheck}
+              >
+                Identity verified
+              </StatusPill>
+
+              <h1>
+                Welcome back,
+                <span>
+                  {employeeName}
+                </span>
+              </h1>
+
+              <p className="ed-hero-description">
+                Manage your digital credentials
+                from one protected workspace.
+                Every certificate has its own
+                verification identity and QR.
+              </p>
+
+              <div className="ed-employee-meta">
+
+                <div className="ed-meta-item">
+                  <Mail size={13} />
+
+                  <span>
+                    {employeeEmail}
+                  </span>
+                </div>
+
+                <div className="ed-meta-item">
+                  <Fingerprint size={13} />
+
+                  <span>
+                    ID: {employeeId}
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="ed-workspace-status">
+
+              <div className="ed-workspace-icon">
+                <LockKeyhole size={18} />
+              </div>
+
+              <div>
+                <p>
+                  Workspace
+                </p>
+
+                <strong>
+                  Protected & active
+                </strong>
+              </div>
+
+              <Radio
+                size={13}
+                className="ed-live-icon"
+              />
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            ERROR
+        ================================================== */}
+
+        {error && (
+          <div className="ed-error">
+
+            <div className="ed-error-icon">
+              <Shield size={15} />
+            </div>
+
+            <div>
+              <strong>
+                Something needs attention
+              </strong>
+
+              <p>
+                {error}
+              </p>
+            </div>
 
           </div>
         )}
 
+        {/* =================================================
+            STATS
+        ================================================== */}
 
-        {/* ===================================================
-            SUMMARY
-        =================================================== */}
+        <section className="ed-stats">
 
-        <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="ed-stat-card">
 
+            <div className="ed-stat-top">
 
-          {/* EMPLOYEE */}
-
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-5 shadow-xl transition duration-300 hover:-translate-y-0.5 hover:border-cyan-400/15">
-
-            <div className="mb-4 flex items-center gap-3">
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/8 text-cyan-400">
-
-                <User
-                  size={19}
-                />
-
+              <div className="ed-stat-icon cyan">
+                <User size={18} />
               </div>
 
-
-              <span className="text-[9px] font-extrabold tracking-[1.3px] text-slate-500">
-                EMPLOYEE
-              </span>
-
-
-              <span className="ml-auto flex items-center gap-1.5 rounded-full bg-green-400/8 px-2 py-1 text-[8px] font-extrabold text-green-400">
-
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-
-                Active
-
-              </span>
-
-            </div>
-
-
-            <h2 className="truncate text-xl font-extrabold text-slate-100">
-              {employee?.name ||
-                "-"}
-            </h2>
-
-
-            <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-
-              <Mail
-                size={14}
+              <CircleCheck
+                size={16}
+                className="ed-success"
               />
 
-              <span className="truncate">
-                {employee?.email ||
-                  "-"}
-              </span>
-
             </div>
+
+            <p className="ed-stat-label">
+              Employee account
+            </p>
+
+            <strong>
+              Active
+            </strong>
+
+            <span>
+              Identity successfully verified
+            </span>
 
           </div>
 
+          <div className="ed-stat-card">
 
-          {/* CERTIFICATE */}
+            <div className="ed-stat-top">
 
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-5 shadow-xl transition duration-300 hover:-translate-y-0.5 hover:border-indigo-400/15">
-
-            <div className="mb-4 flex items-center gap-3">
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-400/9 text-indigo-400">
-
-                <FileBadge
-                  size={19}
-                />
-
+              <div className="ed-stat-icon sky">
+                <FileCheck2 size={18} />
               </div>
 
-
-              <span className="text-[9px] font-extrabold tracking-[1.3px] text-slate-500">
-                CERTIFICATE
-              </span>
-
-
-              <span className="ml-auto flex items-center gap-1 rounded-full bg-cyan-400/8 px-2 py-1 text-[8px] font-extrabold text-cyan-300">
-
-                <Check
-                  size={11}
-                />
-
-                ISSUED
-
+              <span className="ed-stat-count">
+                {
+                  issuedCertificates.length
+                }
               </span>
 
             </div>
 
+            <p className="ed-stat-label">
+              Certificates
+            </p>
 
-            <h2 className="truncate text-xl font-extrabold text-slate-100">
-              {certificate?.certificateNo ||
-                "Certificate"}
-            </h2>
+            <strong>
+              {issuedCertificates.length
+                ? "Available"
+                : "None yet"}
+            </strong>
 
+            <span>
+              Issued credentials
+            </span>
 
-            <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+          </div>
 
-              <BookOpen
-                size={14}
+          <div className="ed-stat-card">
+
+            <div className="ed-stat-top">
+
+              <div className="ed-stat-icon cyan">
+                <ShieldCheck size={18} />
+              </div>
+
+              <Sparkles
+                size={15}
+                className="ed-cyan"
               />
 
-              <span className="truncate">
-                {certificate?.courseName ||
-                  "Certificate information"}
-              </span>
+            </div>
+
+            <p className="ed-stat-label">
+              Certificates accessible
+            </p>
+
+            <strong>
+              {
+                issuedCertificates.length
+              }
+            </strong>
+
+            <span>
+              Available to your account
+            </span>
+
+          </div>
+
+          <div className="ed-stat-card">
+
+            <div className="ed-stat-top">
+
+              <div className="ed-stat-icon blue">
+                <Activity size={18} />
+              </div>
+
+              <span className="ed-active-dot" />
 
             </div>
+
+            <p className="ed-stat-label">
+              Security status
+            </p>
+
+            <strong>
+              Protected
+            </strong>
+
+            <span>
+              Ownership controls enabled
+            </span>
 
           </div>
 
         </section>
 
+        {/* =================================================
+            PENDING REQUESTS
+        ================================================== */}
 
-        {/* ===================================================
-            MAIN GRID
-        =================================================== */}
+        {pendingRequests.length >
+          0 && (
+          <section className="ed-section">
 
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_380px]">
-
-
-          {/* =================================================
-              CERTIFICATE DETAILS
-          ================================================= */}
-
-          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.035] shadow-2xl">
-
-            <div className="flex items-center gap-3 border-b border-white/6 px-5 py-5">
-
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-400/9 text-indigo-400">
-
-                <FileBadge
-                  size={21}
-                />
-
-              </div>
-
+            <div className="ed-section-heading">
 
               <div>
 
-                <span className="block text-[9px] font-extrabold tracking-[1.3px] text-slate-500">
-                  CERTIFICATE DETAILS
-                </span>
+                <p className="ed-section-eyebrow amber">
+                  Requests
+                </p>
 
-                <h2 className="mt-1 text-[17px] font-extrabold text-slate-100">
-                  Your Certificate
+                <h2>
+                  Pending certificates
                 </h2>
 
               </div>
 
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    "/certificate/request"
+                  )
+                }
+                className="ed-text-button"
+              >
+                New request
+              </button>
+
             </div>
 
+            <div className="ed-pending-list">
 
-            {certificate ? (
+              {pendingRequests.map(
+                (request) => (
+                  <PendingRequestCard
+                    key={request.id}
+                    request={request}
+                  />
+                )
+              )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2">
+            </div>
 
-                <CertificateDetail
-                  label="Certificate Number"
-                  value={
-                    certificate.certificateNo
-                  }
-                  borderRight
-                />
+          </section>
+        )}
 
+        {/* =================================================
+            CERTIFICATES
+        ================================================== */}
 
-                <CertificateDetail
-                  label="Recipient"
-                  value={
-                    certificate.recipientName ||
-                    employee?.name
-                  }
-                />
+        <section className="ed-section ed-certificates-section">
 
+          <div className="ed-section-heading certificate-heading">
 
-                <CertificateDetail
-                  label="Course"
-                  value={
-                    certificate.courseName
-                  }
-                  borderRight
-                />
+            <div>
 
+              <div className="ed-heading-label">
 
-                <CertificateDetail
-                  label="Issued By"
-                  value={
-                    certificate.issuerName
-                  }
-                />
+                <span />
 
-
-                {/* DATE */}
-
-                <div className="border-b border-white/5 p-5 sm:border-r">
-
-                  <span className="block text-[10px] font-semibold text-slate-500">
-                    Issue Date
-                  </span>
-
-
-                  <strong className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-200">
-
-                    <CalendarDays
-                      size={14}
-                      className="text-slate-500"
-                    />
-
-                    {formatDate(
-                      certificate.issueDate
-                    )}
-
-                  </strong>
-
-                </div>
-
-
-                {/* STATUS */}
-
-                <div className="p-5">
-
-                  <span className="block text-[10px] font-semibold text-slate-500">
-                    Status
-                  </span>
-
-
-                  <strong className="mt-2 flex items-center gap-2 text-sm font-bold capitalize text-green-400">
-
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.7)]" />
-
-                    {certificate.status ||
-                      "issued"}
-
-                  </strong>
-
-                </div>
-
-              </div>
-
-            ) : (
-
-              <div className="flex min-h-70 flex-col items-center justify-center p-8 text-center">
-
-                <FileBadge
-                  size={35}
-                  className="text-slate-700"
-                />
-
-
-                <h3 className="mt-4 text-sm font-bold text-slate-400">
-                  Certificate information unavailable
-                </h3>
-
-
-                <p className="mt-2 max-w-xs text-xs leading-6 text-slate-600">
-                  Generate your certificate QR
-                  to load certificate details.
+                <p className="ed-section-eyebrow">
+                  Digital credentials
                 </p>
 
               </div>
 
-            )}
+              <h2>
+                My Certificates
+              </h2>
+
+              <p className="ed-section-description">
+                Open your certificate directly or
+                generate a secure QR that opens the
+                full certificate.
+              </p>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  "/certificate/request"
+                )
+              }
+              className="ed-secondary-button"
+            >
+              Request certificate
+              <ArrowRight size={14} />
+            </button>
 
           </div>
 
-
-          {/* =================================================
-              QR
-          ================================================= */}
-
-          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.035] shadow-2xl">
-
-            {!qrGenerated ? (
-
-              <div className="p-5">
-
-                <div className="mb-5 flex items-center gap-3">
-
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/8 text-cyan-400">
-
-                    <QrCode
-                      size={22}
-                    />
-
-                  </div>
-
-
-                  <div>
-
-                    <span className="block text-[9px] font-extrabold tracking-[1.3px] text-slate-500">
-                      VERIFICATION
-                    </span>
-
-                    <h2 className="mt-1 text-[17px] font-extrabold text-slate-100">
-                      Generate QR Code
-                    </h2>
-
-                  </div>
-
-                </div>
-
-
-                <div className="mb-5 flex min-h-47.5 items-center justify-center rounded-xl border border-dashed border-white/9 bg-[radial-gradient(circle,rgba(34,211,238,0.06),transparent_65%)]">
-
-                  <div className="relative h-32 w-32 bg-[linear-gradient(90deg,rgba(255,255,255,.06)_10%,transparent_10%),linear-gradient(rgba(255,255,255,.06)_10%,transparent_10%)] bg-size-[12px_12px]">
-
-                    <div className="absolute left-2 top-2 h-8 w-8 border-[5px] border-cyan-400 border-b-4 border-r-4" />
-
-                    <div className="absolute right-2 top-2 h-8 w-8 border-[5px] border-cyan-400 border-b-4 border-l-4" />
-
-                    <div className="absolute bottom-2 left-2 h-8 w-8 border-[5px] border-cyan-400 border-r-4 border-t-4" />
-
-                    <div className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#070b12] text-cyan-400">
-
-                      <ShieldCheck
-                        size={19}
-                      />
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                <p className="mb-5 text-center text-xs leading-6 text-slate-500">
-                  Generate your certificate
-                  verification QR code. Anyone
-                  with this QR code can verify
-                  your certificate.
-                </p>
-
-
-                <button
-                  type="button"
-                  onClick={generateQR}
-                  disabled={qrLoading}
-                  className="flex min-h-11.5 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-xs font-extrabold text-white shadow-lg shadow-cyan-900/20 transition hover:-translate-y-0.5 hover:shadow-cyan-900/30 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-
-                  {qrLoading ? (
-                    <>
-                      <RefreshCw
-                        size={17}
-                        className="animate-spin"
-                      />
-
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <QrCode
-                        size={18}
-                      />
-
-                      Generate Certificate QR
-                    </>
-                  )}
-
-                </button>
-
-
-                <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-400/10 bg-amber-400/4 p-3 text-amber-400">
-
-                  <LockKeyhole
-                    size={16}
-                    className="mt-0.5 shrink-0"
-                  />
-
-                  <div>
-
-                    <strong className="block text-[10px] text-amber-300">
-                      One-time generation
-                    </strong>
-
-                    <span className="mt-1 block text-[10px] leading-5 text-stone-500">
-                      Your QR uses the existing
-                      certificate verification
-                      token.
-                    </span>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            ) : (
-
-              <div className="p-5">
-
-                <div className="mb-4 flex items-start justify-between">
-
-                  <div>
-
-                    <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-green-400/8 px-2 py-1 text-[8px] font-extrabold tracking-[0.8px] text-green-400">
-
-                      <Check
-                        size={11}
-                      />
-
-                      GENERATED
-
-                    </div>
-
-
-                    <h2 className="text-xl font-extrabold text-white">
-                      Certificate QR
-                    </h2>
-
-
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Scan to verify certificate
-                      authenticity.
-                    </p>
-
-                  </div>
-
-
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/10 bg-cyan-400/[0.07] text-cyan-400">
-
-                    <QrCode
-                      size={21}
-                    />
-
-                  </div>
-
-                </div>
-
-
-                {/* REAL QR */}
-
-                <div className="flex items-center justify-center rounded-xl border border-white/6 bg-white/1.5 p-5">
-
-                  <div className="rounded-xl bg-white p-3 shadow-2xl">
-
-                    <QRCodeSVG
-                      value={
-                        verificationUrl
+          {issuedCertificates.length ===
+          0 ? (
+            <EmptyCertificates
+              onRequest={() =>
+                navigate(
+                  "/certificate/request"
+                )
+              }
+            />
+          ) : (
+            <div className="ed-certificate-grid">
+
+              {issuedCertificates.map(
+                (certificate) => {
+                  const copied =
+                    copiedId ===
+                    String(
+                      certificate.id
+                    );
+
+                  return (
+                    <article
+                      key={
+                        certificate.id
                       }
-                      size={205}
-                      bgColor="#ffffff"
-                      fgColor="#07111f"
-                      level="H"
-                      includeMargin
-                    />
+                      className="ed-certificate-card"
+                    >
 
-                  </div>
+                      <div className="ed-card-top-line" />
 
-                </div>
+                      <div className="ed-card-glow" />
 
+                      <div className="ed-certificate-content">
 
-                {/* SUCCESS */}
+                        {/* HEADER */}
 
-                <div className="my-3 flex items-center justify-center gap-1.5 text-[10px] font-bold text-green-400">
+                        <div className="ed-certificate-header">
 
-                  <Check
-                    size={15}
-                  />
+                          <div className="ed-certificate-title">
 
-                  QR code generated successfully
+                            <div className="ed-certificate-icon">
+                              <BadgeCheck size={22} />
+                            </div>
 
-                </div>
+                            <div>
 
+                              <p>
+                                Certificate
+                              </p>
 
-                {/* ACTIONS */}
+                              <strong>
+                                {certificate.certificateNo ||
+                                  "Certificate"}
+                              </strong>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            </div>
 
-                  <button
-                    type="button"
-                    onClick={
-                      verifyCertificate
-                    }
-                    className="flex min-h-10.75 items-center justify-center gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/9 text-[11px] font-bold text-cyan-300 transition hover:bg-cyan-400/15"
-                  >
+                          </div>
 
-                    <ExternalLink
-                      size={16}
-                    />
+                          <StatusPill
+                            tone="green"
+                            icon={
+                              CircleCheck
+                            }
+                          >
+                            Issued
+                          </StatusPill>
 
-                    Verify Certificate
+                        </div>
 
-                  </button>
+                        {/* COURSE */}
 
+                        <div className="ed-course-box">
 
-                  <button
-                    type="button"
-                    onClick={
-                      copyVerificationUrl
-                    }
-                    className={`flex min-h-10.75 items-center justify-center gap-2 rounded-xl border text-[11px] font-bold transition ${
-                      copied
-                        ? "border-green-400/15 bg-green-400/[0.07] text-green-400"
-                        : "border-white/8 bg-white/3 text-slate-400 hover:bg-white/[0.07] hover:text-white"
-                    }`}
-                  >
+                          <p>
+                            Course / Program
+                          </p>
 
-                    {copied ? (
-                      <>
-                        <Check
-                          size={16}
-                        />
+                          <h3>
+                            {certificate.courseName ||
+                              "Certificate credential"}
+                          </h3>
 
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy
-                          size={16}
-                        />
+                          <div className="ed-course-line" />
 
-                        Copy Link
-                      </>
-                    )}
+                          <div className="ed-details-grid">
 
-                  </button>
+                            <CertificateDetail
+                              icon={User}
+                              label="Recipient"
+                              value={
+                                certificate.recipientName ||
+                                employeeName
+                              }
+                            />
 
-                </div>
+                            <CertificateDetail
+                              icon={
+                                CalendarDays
+                              }
+                              label="Issued"
+                              value={formatDate(
+                                certificate.issueDate
+                              )}
+                            />
 
+                            <CertificateDetail
+                              icon={
+                                BookOpen
+                              }
+                              label="Program"
+                              value={
+                                certificate.courseName
+                              }
+                            />
 
-                {/* VIEW CERTIFICATE */}
+                            <CertificateDetail
+                              icon={
+                                ShieldCheck
+                              }
+                              label="Issuer"
+                              value={
+                                certificate.issuerName
+                              }
+                            />
 
-                <button
-                  type="button"
-                  onClick={
-                    viewCertificate
-                  }
-                  className="mt-2 flex min-h-10.75 w-full items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/3 text-[11px] font-bold text-slate-400 transition hover:bg-white/[0.07] hover:text-white"
-                >
+                          </div>
 
-                  <FileBadge
-                    size={16}
-                  />
+                        </div>
 
-                  View Certificate
+                        {/* ACCESS STATE */}
 
-                  <ArrowRight
-                    size={15}
-                  />
+                        <div className="ed-verification-state">
 
-                </button>
+                          <div className="ed-verified-box">
 
-              </div>
+                            <div>
+                              <CircleCheck size={17} />
+                            </div>
 
-            )}
+                            <section>
 
-          </div>
+                              <strong>
+                                Certificate available
+                              </strong>
+
+                              <span>
+                                Open the full certificate
+                                securely using your
+                                employee account.
+                              </span>
+
+                            </section>
+
+                          </div>
+
+                        </div>
+
+                        {/* ACTIONS */}
+
+                        <div className="ed-actions">
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              viewCertificate(
+                                certificate
+                              )
+                            }
+                            className="ed-view-button"
+                          >
+                            <ExternalLink size={15} />
+
+                            View Certificate
+
+                            <ArrowRight size={13} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedCertificate(
+                                certificate
+                              )
+                            }
+                            className="ed-qr-button"
+                          >
+                            <QrCode size={15} />
+
+                            Generate QR
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyVerificationUrl(
+                                certificate
+                              )
+                            }
+                            className="ed-copy-button"
+                            title="Copy secure certificate link"
+                          >
+                            {copied ? (
+                              <Check
+                                size={15}
+                                className="ed-success"
+                              />
+                            ) : (
+                              <Copy size={15} />
+                            )}
+
+                            <span>
+                              {copied
+                                ? "Copied"
+                                : "Copy"}
+                            </span>
+                          </button>
+
+                        </div>
+
+                        {/* FOOTER */}
+
+                        <div className="ed-card-footer">
+
+                          <span>
+                            <Fingerprint size={12} />
+
+                            Employee protected
+                          </span>
+
+                          <span>
+                            <LockKeyhole size={12} />
+
+                            Full certificate access
+                          </span>
+
+                        </div>
+
+                      </div>
+
+                    </article>
+                  );
+                }
+              )}
+
+            </div>
+          )}
 
         </section>
 
-
-        {/* ===================================================
-            VERIFICATION LINK
-        =================================================== */}
-
-        {qrGenerated &&
-          verificationUrl && (
-
-            <section className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/2.5 p-4">
-
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/[0.07] text-cyan-400">
-
-                <Clipboard
-                  size={19}
-                />
-
-              </div>
-
-
-              <div className="min-w-0 flex-1">
-
-                <span className="block text-[8px] font-extrabold tracking-[1.2px] text-slate-500">
-                  VERIFICATION LINK
-                </span>
-
-
-                <p className="mt-1 truncate text-[11px] text-slate-500">
-                  {verificationUrl}
-                </p>
-
-              </div>
-
-
-              <button
-                type="button"
-                onClick={
-                  copyVerificationUrl
-                }
-                className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-[10px] font-bold transition ${
-                  copied
-                    ? "border-green-400/15 bg-green-400/[0.07] text-green-400"
-                    : "border-white/8 bg-white/3 text-slate-400 hover:bg-white/[0.07] hover:text-white"
-                }`}
-              >
-
-                {copied ? (
-                  <>
-                    <Check
-                      size={15}
-                    />
-
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy
-                      size={15}
-                    />
-
-                    Copy
-                  </>
-                )}
-
-              </button>
-
-            </section>
-
-          )}
-
-
-        {/* ===================================================
+        {/* =================================================
             SECURITY
-        =================================================== */}
+        ================================================== */}
 
-        <section className="mt-5 flex items-center gap-4 rounded-2xl border border-cyan-400/10 bg-linear-to-r from-cyan-400/5 to-blue-600/2.5 p-5">
+        <section className="ed-security-grid">
 
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-400/10 bg-cyan-400/[0.07] text-cyan-400">
+          <div className="ed-security-card">
 
-            <ShieldCheck
-              size={23}
-            />
-
-          </div>
-
-
-          <div className="min-w-0 flex-1">
-
-            <div className="flex flex-wrap items-center gap-2">
-
-              <h3 className="text-sm font-extrabold text-slate-200">
-                Secure Certificate Verification
-              </h3>
-
-
-              <span className="rounded-full bg-cyan-400/8 px-1.5 py-0.5 text-[7px] font-extrabold tracking-[0.7px] text-cyan-300">
-                PROTECTED
-              </span>
-
+            <div className="ed-security-icon cyan">
+              <ShieldCheck size={17} />
             </div>
 
+            <h3>
+              Employee protected
+            </h3>
 
-            <p className="mt-1.5 max-w-4xl text-[11px] leading-5 text-slate-500">
-              Your QR code contains a unique
-              verification link connected to
-              the CertiVerify system. Anyone
-              who scans the code can verify
-              the certificate information
-              without accessing your employee
-              account.
+            <p>
+              Your certificate is loaded through
+              an authenticated employee session.
             </p>
 
           </div>
 
+          <div className="ed-security-card">
 
-          <BadgeCheck
-            size={28}
-            className="hidden shrink-0 text-green-500/60 sm:block"
-          />
+            <div className="ed-security-icon sky">
+              <QrCode size={17} />
+            </div>
 
-        </section>
+            <h3>
+              One QR per certificate
+            </h3>
 
-
-        {/* ===================================================
-            FOOTER
-        =================================================== */}
-
-        <footer className="mt-8 flex flex-col gap-2 border-t border-white/5 pt-5 sm:flex-row sm:items-center sm:justify-between">
-
-          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-
-            <ShieldCheck
-              size={16}
-              className="text-cyan-500"
-            />
-
-            CertiVerify
+            <p>
+              Each certificate has its own unique
+              verification token and QR credential.
+            </p>
 
           </div>
 
+          <div className="ed-security-card">
 
-          <p className="text-[10px] text-slate-700">
-            Secure certificate verification platform
-          </p>
+            <div className="ed-security-icon blue">
+              <LockKeyhole size={17} />
+            </div>
+
+            <h3>
+              Ownership protected
+            </h3>
+
+            <p>
+              The server checks the certificate token
+              against the authenticated employee before
+              returning the full certificate.
+            </p>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            FOOTER
+        ================================================== */}
+
+        <footer className="ed-footer">
+
+          <div className="ed-footer-left">
+
+            <div className="ed-footer-icon">
+              <ShieldCheck size={12} />
+            </div>
+
+            <span>
+              ESPARKS IT SOLUTIONS Secure Credential Network
+            </span>
+
+          </div>
+
+          <div className="ed-footer-right">
+
+            <span>
+              Protected workspace
+            </span>
+
+            <i />
+
+            <span>
+              Full certificate access enabled
+            </span>
+
+          </div>
 
         </footer>
 
-      </main>
+      </div>
 
-    </div>
-  );
-}
+      {/* =================================================
+          QR MODAL
+      ================================================== */}
 
+      {selectedCertificate && (
+        <QRModal
+          certificate={
+            selectedCertificate
+          }
+          onClose={() =>
+            setSelectedCertificate(
+              null
+            )
+          }
+          onViewCertificate={
+            viewCertificate
+          }
+        />
+      )}
 
-// =========================================================
-// CERTIFICATE DETAIL COMPONENT
-// =========================================================
-
-function CertificateDetail({
-  label,
-  value,
-  borderRight = false,
-}) {
-  return (
-    <div
-      className={`border-b border-white/5 p-5 ${
-        borderRight
-          ? "sm:border-r"
-          : ""
-      }`}
-    >
-
-      <span className="block text-[10px] font-semibold text-slate-500">
-        {label}
-      </span>
-
-
-      <strong className="mt-2 block truncate text-sm font-bold text-slate-200">
-        {value || "-"}
-      </strong>
-
-    </div>
+    </main>
   );
 }

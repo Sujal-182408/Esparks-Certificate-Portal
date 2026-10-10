@@ -1,26 +1,43 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
 import {
   useLocation,
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
+
 import { QRCodeSVG } from "qrcode.react";
+
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Loader2,
+  Download,
+  GraduationCap,
 } from "lucide-react";
 
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
 import { apiRequest } from "../services/api";
+
 import companyLogo from "../assets/logo.png";
 import sign from "../assets/sign.png";
+import nipLogo from "../assets/niplogo.png";
+import msmeLogo from "../assets/msmelogo.png";
+import isoLogo from "../assets/iso-logo.png";
 
 import "./CertificateView.css";
 
-// ============================================================
-// NORMALIZE BACKEND CERTIFICATE DATA
-// ============================================================
+/* ============================================================
+   NORMALIZE CERTIFICATE DATA
+============================================================ */
 
 function normalizeCertificate(raw = {}) {
   return {
@@ -43,6 +60,11 @@ function normalizeCertificate(raw = {}) {
       raw.certificate_no ||
       "",
 
+    certificateType:
+      raw.certificateType ||
+      raw.certificate_type ||
+      "INTERNSHIP",
+
     issueDate:
       raw.issueDate ||
       raw.issue_date ||
@@ -62,18 +84,6 @@ function normalizeCertificate(raw = {}) {
       raw.status ||
       "",
 
-    employeeName:
-      raw.employeeName ||
-      raw.employee_name ||
-      raw.recipientName ||
-      raw.recipient_name ||
-      "",
-
-    employeeEmail:
-      raw.employeeEmail ||
-      raw.employee_email ||
-      "",
-
     createdAt:
       raw.createdAt ||
       raw.created_at ||
@@ -86,9 +96,9 @@ function normalizeCertificate(raw = {}) {
   };
 }
 
-// ============================================================
-// TITLE CASE
-// ============================================================
+/* ============================================================
+   TITLE CASE
+============================================================ */
 
 function toTitleCase(value = "") {
   return value
@@ -100,14 +110,12 @@ function toTitleCase(value = "") {
     );
 }
 
-// ============================================================
-// DATE FORMATTER
-// ============================================================
+/* ============================================================
+   DATE
+============================================================ */
 
 function formatCertificateDate(value) {
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
 
   const date = new Date(value);
 
@@ -122,9 +130,9 @@ function formatCertificateDate(value) {
   });
 }
 
-// ============================================================
-// CERTIFICATE VIEW
-// ============================================================
+/* ============================================================
+   COMPONENT
+============================================================ */
 
 const CertificateView = () => {
   const location = useLocation();
@@ -133,38 +141,265 @@ const CertificateView = () => {
 
   const token = searchParams.get("token");
 
-  const [certificate, setCertificate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const certificateRef = useRef(null);
 
-  // ==========================================================
-  // ADMIN / EMPLOYEE DETECTION
-  // ==========================================================
+  const [certificate, setCertificate] =
+    useState(null);
 
-  const isAdmin = location.pathname.startsWith("/admin");
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [isDownloading, setIsDownloading] =
+    useState(false);
+
+  /* ==========================================================
+     ADMIN / EMPLOYEE
+  ========================================================== */
+
+  const isAdmin =
+    location.pathname.startsWith("/admin");
 
   const dashboardPath = isAdmin
     ? "/admin"
     : "/dashboard";
 
-  // ==========================================================
-  // VERIFICATION URL
-  // IMPORTANT:
-  // This MUST use /verify?token=...
-  // because Admin QR and Employee QR use the same URL format.
-  // ==========================================================
-const verificationUrl = useMemo(() => {
-  if (!certificate?.verificationToken) {
-    return "";
-  }
+  /* ==========================================================
+     VERIFICATION URL
+  ========================================================== */
 
-  return `${window.location.origin}/verify?token=${encodeURIComponent(
-    certificate.verificationToken
-  )}`;
-}, [certificate?.verificationToken]);
-  // ==========================================================
-  // LOAD CERTIFICATE
-  // ==========================================================
+  const verificationUrl = useMemo(() => {
+    if (!certificate?.verificationToken) {
+      return "";
+    }
+
+    return `${window.location.origin}/verify?token=${encodeURIComponent(
+      certificate.verificationToken
+    )}`;
+  }, [
+    certificate?.verificationToken,
+  ]);
+
+  /* ==========================================================
+     WAIT FOR IMAGES
+  ========================================================== */
+
+  const waitForImages = async (element) => {
+    const images = Array.from(
+      element.querySelectorAll("img")
+    );
+
+    await Promise.all(
+      images.map((img) => {
+        if (
+          img.complete &&
+          img.naturalWidth > 0
+        ) {
+          return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+          const handleDone = () => {
+            img.removeEventListener(
+              "load",
+              handleDone
+            );
+
+            img.removeEventListener(
+              "error",
+              handleDone
+            );
+
+            resolve();
+          };
+
+          img.addEventListener(
+            "load",
+            handleDone
+          );
+
+          img.addEventListener(
+            "error",
+            handleDone
+          );
+        });
+      })
+    );
+  };
+
+  /* ==========================================================
+     DOWNLOAD PDF
+
+     IMPORTANT:
+
+     The REAL certificate is captured directly.
+
+     No clone.
+     No layout freezing.
+     No child repositioning.
+
+     Master certificate:
+     1380 × 976
+
+     PDF:
+     A4 landscape
+     297 × 210 mm
+  ========================================================== */
+
+  const handleDownloadPDF = async () => {
+    if (
+      !certificateRef.current ||
+      isDownloading
+    ) {
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+
+      const element =
+        certificateRef.current;
+
+      /* --------------------------------------------------------
+         WAIT FOR FONTS
+      -------------------------------------------------------- */
+
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
+      /* --------------------------------------------------------
+         WAIT FOR IMAGES
+      -------------------------------------------------------- */
+
+      await waitForImages(element);
+
+      /* --------------------------------------------------------
+         CAPTURE MASTER CERTIFICATE
+      -------------------------------------------------------- */
+
+      const canvas =
+        await html2canvas(element, {
+          width: 1380,
+          height: 976,
+
+          windowWidth: 1380,
+          windowHeight: 976,
+
+          x: 0,
+          y: 0,
+
+          scrollX: 0,
+          scrollY: 0,
+
+          scale: 3,
+
+          backgroundColor:
+            "#ffffff",
+
+          useCORS: true,
+
+          allowTaint: false,
+
+          logging: false,
+
+          foreignObjectRendering:
+            false,
+
+          imageTimeout: 15000,
+        });
+
+      /* --------------------------------------------------------
+         PNG
+      -------------------------------------------------------- */
+
+      const imageData =
+        canvas.toDataURL(
+          "image/png",
+          1.0
+        );
+
+      /* --------------------------------------------------------
+         CREATE A4 PDF
+      -------------------------------------------------------- */
+
+      const pdf =
+        new jsPDF({
+          orientation:
+            "landscape",
+
+          unit: "mm",
+
+          format: "a4",
+
+          compress: true,
+        });
+
+      /* --------------------------------------------------------
+         FIT COMPLETE CERTIFICATE TO A4
+
+         1380 × 976
+
+         becomes
+
+         297 × 210 mm
+      -------------------------------------------------------- */
+
+      pdf.addImage(
+        imageData,
+        "PNG",
+        0,
+        0,
+        297,
+        210,
+        undefined,
+        "FAST"
+      );
+
+      /* --------------------------------------------------------
+         FILE NAME
+      -------------------------------------------------------- */
+
+      const certificateNumber =
+        certificate?.certificateNo ||
+        "certificate";
+
+      const safeName =
+        String(
+          certificateNumber
+        )
+          .replace(
+            /[<>:"/\\|?*]+/g,
+            "-"
+          )
+          .trim();
+
+      pdf.save(
+        `${
+          safeName ||
+          "certificate"
+        }.pdf`
+      );
+    } catch (error) {
+      console.error(
+        "PDF generation failed:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Unable to generate certificate PDF."
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  /* ==========================================================
+     LOAD CERTIFICATE
+  ========================================================== */
 
   useEffect(() => {
     let mounted = true;
@@ -180,40 +415,63 @@ const verificationUrl = useMemo(() => {
           );
         }
 
-        const data = await apiRequest(
-          `/verify/${encodeURIComponent(token)}`
-        );
+        const data =
+          await apiRequest(
+            `/verify/${encodeURIComponent(
+              token
+            )}`
+          );
 
         if (!mounted) {
           return;
         }
 
-        if (!data?.valid) {
+        if (
+          !data?.valid ||
+          !data?.certificate
+        ) {
           throw new Error(
             data?.message ||
-              "This certificate could not be verified."
+              "This certificate could not be loaded."
           );
         }
 
-        const normalized = normalizeCertificate(
-          data.certificate
-        );
+        const normalizedCertificate =
+          normalizeCertificate(
+            data.certificate
+          );
 
-        setCertificate(normalized);
+        const certificateStatus =
+          String(
+            normalizedCertificate.status ||
+              ""
+          ).toLowerCase();
+
+        if (
+          certificateStatus &&
+          certificateStatus !==
+            "issued"
+        ) {
+          throw new Error(
+            "This certificate has been revoked and is no longer available."
+          );
+        }
+
+        setCertificate(
+          normalizedCertificate
+        );
       } catch (err) {
         console.error(
-          "Certificate verification error:",
+          "Certificate loading error:",
           err
         );
 
-        if (!mounted) {
-          return;
+        if (mounted) {
+          setError(
+            err?.message ||
+              "Unable to load this certificate."
+          );
         }
-
-        setError(
-          err?.message ||
-            "Unable to verify this certificate."
-        );
       } finally {
         if (mounted) {
           setLoading(false);
@@ -228,44 +486,58 @@ const verificationUrl = useMemo(() => {
     };
   }, [token]);
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
+  /* ==========================================================
+     LOADING
+  ========================================================== */
 
   if (loading) {
     return (
       <div className="certificate-state-page">
         <div className="certificate-state-card">
+
           <Loader2
-            className="certificate-state-icon spin"
             size={42}
+            className="certificate-state-icon spin"
           />
 
-          <h2>Verifying Certificate</h2>
+          <h2>
+            Loading Certificate
+          </h2>
 
           <p>
-            Please wait while we verify the certificate
-            with the official verification system.
+            Please wait while we
+            securely load your
+            certificate from the
+            official certificate
+            system.
           </p>
+
         </div>
       </div>
     );
   }
 
-  // ==========================================================
-  // ERROR
-  // ==========================================================
+  /* ==========================================================
+     ERROR
+  ========================================================== */
 
-  if (error || !certificate) {
+  if (
+    error ||
+    !certificate
+  ) {
     return (
       <div className="certificate-state-page">
+
         <div className="certificate-state-card certificate-error-card">
+
           <AlertCircle
-            className="certificate-state-icon error-icon"
             size={46}
+            className="certificate-state-icon error-icon"
           />
 
-          <h2>Certificate Verification Failed</h2>
+          <h2>
+            Certificate Access Failed
+          </h2>
 
           <p>
             {error ||
@@ -275,19 +547,25 @@ const verificationUrl = useMemo(() => {
           <button
             type="button"
             className="certificate-back-button"
-            onClick={() => navigate(dashboardPath)}
+            onClick={() =>
+              navigate(
+                dashboardPath
+              )
+            }
           >
             <ArrowLeft size={18} />
+
             Back to Dashboard
           </button>
+
         </div>
       </div>
     );
   }
 
-  // ==========================================================
-  // CERTIFICATE DATA
-  // ==========================================================
+  /* ==========================================================
+     CERTIFICATE DATA
+  ========================================================== */
 
   const recipientName =
     certificate.recipientName ||
@@ -300,6 +578,10 @@ const verificationUrl = useMemo(() => {
   const certificateNo =
     certificate.certificateNo ||
     "N/A";
+
+  const certificateType =
+    certificate.certificateType ||
+    "INTERNSHIP";
 
   const issuerName =
     certificate.issuerName ||
@@ -317,186 +599,158 @@ const verificationUrl = useMemo(() => {
   const isIssued =
     status === "issued";
 
-  // ==========================================================
-  // CERTIFICATE
-  // ==========================================================
+  /* ==========================================================
+     RENDER
+  ========================================================== */
 
   return (
     <div className="certificate-page">
 
       {/* =====================================================
-          TOP ACTION BAR
-      ====================================================== */}
+          ACTION BAR
+      ===================================================== */}
 
       <div className="certificate-actions no-print">
 
         <button
           type="button"
           className="certificate-dashboard-button"
-          onClick={() => navigate(dashboardPath)}
+          onClick={() =>
+            navigate(
+              dashboardPath
+            )
+          }
         >
           <ArrowLeft size={17} />
+
           Dashboard
         </button>
 
-        <div className="certificate-verification-status">
-          {isIssued ? (
-            <>
-              <CheckCircle2 size={17} />
-              Certificate Verified
-            </>
-          ) : (
-            <>
-              <AlertCircle size={17} />
-              Certificate Revoked
-            </>
-          )}
-        </div>
+        <div className="certificate-admin-actions">
 
+          <button
+            type="button"
+            className="certificate-dashboard-button"
+            onClick={
+              handleDownloadPDF
+            }
+            disabled={
+              isDownloading
+            }
+          >
+            <Download size={16} />
+
+            {isDownloading
+              ? "Generating PDF..."
+              : "Download PDF"}
+          </button>
+
+          <div className="certificate-verification-status">
+
+            {isIssued ? (
+              <>
+                <CheckCircle2
+                  size={17}
+                />
+
+                Certificate Verified
+              </>
+            ) : (
+              <>
+                <AlertCircle
+                  size={17}
+                />
+
+                Certificate Revoked
+              </>
+            )}
+
+          </div>
+
+        </div>
       </div>
 
       {/* =====================================================
-          CERTIFICATE DOCUMENT
-      ====================================================== */}
+          CERTIFICATE WRAPPER
+      ===================================================== */}
 
       <div className="certificate-wrapper">
 
-        <div
+        <article
+          ref={certificateRef}
           className={`certificate-document ${
-            isIssued
-              ? ""
-              : "certificate-document-revoked"
+            !isIssued
+              ? "certificate-document-revoked"
+              : ""
           }`}
         >
 
           {/* =================================================
-              SECURITY / WATERMARK
-          ================================================== */}
+              WATERMARK
+          ================================================= */}
 
-          <div className="certificate-watermark">
-            eSPARKS
-          </div>
+          <img
+            src={companyLogo}
+            alt=""
+            aria-hidden="true"
+            className="certificate-watermark"
+          />
 
-          <div className="certificate-watermark-sub">
-            CERTIFICATE • VERIFIED
+          {/* =================================================
+              FRAME
+          ================================================= */}
+
+          <div className="certificate-frame">
+
+            <div className="certificate-frame-inner">
+
+              <span className="frame-corner frame-tl" />
+
+              <span className="frame-corner frame-tr" />
+
+              <span className="frame-corner frame-bl" />
+
+              <span className="frame-corner frame-br" />
+
+            </div>
+
           </div>
 
           {/* =================================================
-              DECORATIVE CORNERS
-          ================================================== */}
+              CERTIFICATE ID
+          ================================================= */}
 
-          <div className="certificate-corner certificate-corner-tl">
-            <span></span>
-          </div>
+          <div className="certificate-top-id">
 
-          <div className="certificate-corner certificate-corner-tr">
-            <span></span>
-          </div>
+            <span>
+              CERTIFICATE-ID:
+              <br />
+            </span>
 
-          <div className="certificate-corner certificate-corner-bl">
-            <span></span>
-          </div>
+            {certificateNo}
 
-          <div className="certificate-corner certificate-corner-br">
-            <span></span>
-          </div>
-
-          {/* =================================================
-              GOLD RIBBONS
-          ================================================== */}
-
-          <div className="certificate-ribbon certificate-ribbon-tl"></div>
-
-          <div className="certificate-ribbon certificate-ribbon-br"></div>
-
-          {/* =================================================
-              BORDERS
-          ================================================== */}
-
-          <div className="certificate-outer-border"></div>
-
-          <div className="certificate-gold-border"></div>
-
-          <div className="certificate-inner-border"></div>
-
-          {/* =================================================
-              SECURITY PATTERN
-          ================================================== */}
-
-          <div className="certificate-security-pattern">
-            <span>eSparks</span>
-            <span>eSparks</span>
-            <span>eSparks</span>
-            <span>eSparks</span>
-            <span>eSparks</span>
-            <span>eSparks</span>
           </div>
 
           {/* =================================================
               HEADER
-          ================================================== */}
+          ================================================= */}
 
           <header className="certificate-header">
 
-            {/* COMPANY BRAND */}
-
-            <div className="certificate-brand">
+            <div className="certificate-logo-left">
 
               <img
                 src={companyLogo}
                 alt="eSparks IT Solutions"
-                className="certificate-logo"
               />
 
-          
             </div>
 
-            {/* =================================================
-                QR CODE
-            ================================================== */}
+            <div className="certificate-top-icon">
 
-            <div className="certificate-qr-section">
-
-              {verificationUrl ? (
-                <>
-                  <div className="certificate-qr-box">
-
-                    <QRCodeSVG
-                      value={verificationUrl}
-                      size={112}
-                      bgColor="#ffffff"
-                      fgColor="#09284f"
-                      level="H"
-                      includeMargin={false}
-                    />
-
-                  </div>
-
-                  <div className="certificate-qr-title">
-                    SCAN TO VERIFY
-                  </div>
-
-                  <div className="certificate-qr-subtitle">
-                    Certificate authenticity
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="certificate-qr-box certificate-qr-unavailable">
-                    <AlertCircle
-                      size={28}
-                    />
-
-                    <span>
-                      QR unavailable
-                    </span>
-                  </div>
-
-                  <div className="certificate-qr-title">
-                    VERIFICATION UNAVAILABLE
-                  </div>
-                </>
-              )}
+              <GraduationCap
+                className="certificate-graduation-icon"
+              />
 
             </div>
 
@@ -504,241 +758,218 @@ const verificationUrl = useMemo(() => {
 
           {/* =================================================
               TITLE
-          ================================================== */}
+          ================================================= */}
 
           <section className="certificate-title-section">
 
-            <p className="certificate-title-small">
-              CERTIFICATE OF
-            </p>
-
             <h1>
-              COMPLETION
+              CERTIFICATE
             </h1>
 
-            <div className="certificate-title-decoration">
+            <h2>
+              OF INTERNSHIP PROGRAM
+            </h2>
 
-              <span></span>
-
-              <i>
-                ◆
-              </i>
-
-              <span></span>
-
-            </div>
+            <div className="certificate-title-line" />
 
           </section>
 
           {/* =================================================
-              MAIN CONTENT
-          ================================================== */}
+              RECIPIENT
+          ================================================= */}
 
-          <main className="certificate-main-content">
+          <section className="certificate-recipient-section">
 
-            <p className="certificate-presented">
-              This certificate is proudly presented to
+            <p className="certificate-awarded-text">
+              THIS CERTIFICATE IS AWARDED TO
             </p>
 
-            <h2 className="certificate-recipient">
-              {toTitleCase(recipientName)}
-            </h2>
-
-            <div className="certificate-recipient-line"></div>
-
-            <p className="certificate-completion">
-              for successfully completing the
-            </p>
-
-            <h3 className="certificate-course">
-              {courseName}
+            <h3 className="certificate-recipient">
+              {toTitleCase(
+                recipientName
+              )}
             </h3>
 
-            <p className="certificate-description">
-              This certificate recognizes the successful
-              completion of the program and acknowledges
-              the dedication, effort and commitment
-              demonstrated by the recipient.
+          </section>
+
+          {/* =================================================
+              DESCRIPTION
+          ================================================= */}
+
+          <section className="certificate-description-section">
+
+            <p>
+              In recognition of your
+              outstanding performance
+              and dedication during your
+              internship in{" "}
+
+              <strong>
+                {courseName}
+              </strong>
+
+              {" "}at{" "}
+
+              <strong>
+                {issuerName}
+              </strong>
+
+              . Your consistent efforts,
+              technical skills, and
+              professional growth have
+              truly contributed to our
+              internship program.
+
+              <br />
+
+              <span className="certificate-appreciation-text">
+                We appreciate your
+                contribution and wish you
+                success in your future
+                endeavors.
+              </span>
             </p>
 
-          </main>
+          </section>
 
           {/* =================================================
-              SIDE DECORATION
-          ================================================== */}
-
-          <div className="certificate-side-decoration certificate-side-left">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          <div className="certificate-side-decoration certificate-side-right">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          {/* =================================================
-              BOTTOM INFORMATION
-          ================================================== */}
+              BOTTOM
+          ================================================= */}
 
           <section className="certificate-bottom">
 
-            {/* DATE */}
+            {/* QR */}
 
-            <div className="certificate-bottom-item">
+            <div className="certificate-qr">
 
-              <div className="certificate-bottom-icon">
-                ◫
-              </div>
+              {verificationUrl ? (
+                <>
+                  <div className="certificate-qr-box">
 
-              <div className="certificate-bottom-label">
-                DATE OF ISSUE
-              </div>
+                    <QRCodeSVG
+                      value={
+                        verificationUrl
+                      }
+                      size={105}
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                      level="H"
+                      includeMargin={
+                        false
+                      }
+                    />
 
-              <div className="certificate-bottom-value">
-                {issueDate}
-              </div>
-
-              <div className="certificate-bottom-line"></div>
-
-            </div>
-
-            {/* CERTIFICATE NUMBER */}
-
-            <div className="certificate-bottom-item">
-
-              <div className="certificate-bottom-icon">
-                ▤
-              </div>
-
-              <div className="certificate-bottom-label">
-                CERTIFICATE NO.
-              </div>
-
-              <div className="certificate-bottom-value certificate-number">
-                {certificateNo}
-              </div>
-
-              <div className="certificate-bottom-line"></div>
-
-            </div>
-
-            {/* =================================================
-                SEAL
-            ================================================== */}
-
-            <div className="certificate-seal-wrapper">
-
-              <div className="certificate-seal">
-
-                <div className="certificate-seal-inner">
-
-                  <div className="seal-stars">
-                    ★ ★ ★
                   </div>
 
-                  <div className="seal-logo">
-                    e
-                  </div>
+                  <span className="certificate-qr-label">
+                    SCAN TO VERIFY
+                  </span>
+                </>
+              ) : (
+                <div className="certificate-qr-unavailable">
 
-                  <strong>
-                    eSPARKS
-                  </strong>
+                  <AlertCircle
+                    size={24}
+                  />
 
-                  <small>
-                    IT SOLUTIONS
-                  </small>
-
-                  <div className="seal-certified">
-                    CERTIFIED
-                  </div>
-
-                  <div className="seal-stars-bottom">
-                    ★ ★ ★
-                  </div>
+                  <span>
+                    QR unavailable
+                  </span>
 
                 </div>
-
-              </div>
-
-              <div className="seal-ribbon">
-                <span></span>
-                <span></span>
-              </div>
+              )}
 
             </div>
 
-            {/* =================================================
-                SIGNATURE
-            ================================================== */}
+            {/* SIGNATURE */}
 
             <div className="certificate-signature">
 
-                <img
-                            src={sign}
-                            alt="eSparks IT Solutions"
-                            className="certificate-logo "
-                          />
-              <div className="signature-line"></div>
+              <img
+                src={sign}
+                alt="Authorized Signatory"
+              />
 
-              <div className="signature-title">
-                Authorized Signatory
-              </div>
+              <div className="signature-line" />
 
-              <div className="signature-company">
+              <strong>
+                Founder &amp; CEO
+              </strong>
+
+              <span>
                 {issuerName}
-              </div>
+              </span>
 
             </div>
+
+            {/* NIP */}
+
+            <img
+              src={nipLogo}
+              alt="NIP"
+              className="certificate-nip-logo"
+            />
+
+            {/* ISO */}
+
+            <img
+              src={isoLogo}
+              alt="ISO"
+              className="certificate-iso-logo"
+            />
+
+            {/* MSME */}
+
+            <img
+              src={msmeLogo}
+              alt="MSME"
+              className="certificate-msme-logo"
+            />
 
           </section>
 
           {/* =================================================
               FOOTER
-          ================================================== */}
+          ================================================= */}
 
           <footer className="certificate-footer">
 
-            <div className="certificate-footer-icon">
-              ✓
-            </div>
-
-            <div className="certificate-footer-content">
-
-              <strong>
-                Digitally Verifiable Certificate
-              </strong>
-
-              <span>
-                Scan the QR code to verify authenticity.
-              </span>
-
-            </div>
-
-            <div className="certificate-footer-number">
+            <span>
+              Certificate No.{" "}
               {certificateNo}
-            </div>
+            </span>
+
+            <span className="footer-dot">
+              •
+            </span>
+
+            <span>
+              Issued: {issueDate}
+            </span>
+
+            <span className="footer-dot">
+              •
+            </span>
+
+            <span>
+              Verified by{" "}
+              {issuerName}
+            </span>
 
           </footer>
 
           {/* =================================================
-              REVOKED OVERLAY
-          ================================================== */}
+              REVOKED
+          ================================================= */}
 
           {!isIssued && (
             <div className="certificate-revoked-overlay">
 
               <div className="certificate-revoked-badge">
 
-                <AlertCircle size={22} />
+                <AlertCircle
+                  size={20}
+                />
 
                 CERTIFICATE REVOKED
 
@@ -747,8 +978,10 @@ const verificationUrl = useMemo(() => {
             </div>
           )}
 
-        </div>
+        </article>
+
       </div>
+
     </div>
   );
 };

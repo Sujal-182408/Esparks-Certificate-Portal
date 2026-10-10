@@ -1,6 +1,62 @@
 
 @import "tailwindcss";
 
+
+
+/* =========================================================
+   ESPARKS IT SOLUTIONS / ESPARKS THEME
+========================================================= */
+
+:root {
+  --cv-bg: #ffffff;
+  --cv-bg-secondary: #f6f9fc;
+  --cv-card: #ffffff;
+  --cv-card-hover: #f8fbff;
+
+  --cv-border: #e2e8f0;
+  --cv-border-hover: #06b6d4;
+
+  --cv-text: #0f172a;
+  --cv-text-secondary: #475569;
+  --cv-text-muted: #64748b;
+
+  --cv-primary: #06b6d4;
+  --cv-primary-hover: #0891b2;
+  --cv-primary-soft: rgba(6, 182, 212, 0.08);
+
+  --cv-success: #10b981;
+  --cv-danger: #ef4444;
+
+  --cv-header: rgba(255, 255, 255, 0.92);
+
+  --cv-shadow: 0 15px 45px rgba(15, 23, 42, 0.08);
+}
+
+.dark {
+  --cv-bg: #05080d;
+  --cv-bg-secondary: #070b11;
+  --cv-card: #080d14;
+  --cv-card-hover: #0b121b;
+
+  --cv-border: #172231;
+  --cv-border-hover: #22d3ee;
+
+  --cv-text: #f8fafc;
+  --cv-text-secondary: #94a3b8;
+  --cv-text-muted: #64748b;
+
+  --cv-primary: #22d3ee;
+  --cv-primary-hover: #67e8f9;
+  --cv-primary-soft: rgba(34, 211, 238, 0.08);
+
+  --cv-success: #34d399;
+  --cv-danger: #f87171;
+
+  --cv-header: rgba(7, 11, 17, 0.95);
+
+  --cv-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
 :root {
   font-family: Inter, system-ui, sans-serif;
   color: #e5e7eb;

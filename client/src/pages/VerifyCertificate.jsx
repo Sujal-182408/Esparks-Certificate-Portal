@@ -1,942 +1,588 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-
+import { useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
   ShieldX,
   Search,
-  ArrowRight,
   ScanLine,
+  RotateCcw,
+  ArrowLeft,
+  LockKeyhole,
 } from "lucide-react";
 
 import QRScanner from "../components/QRScanner";
-import BackButton from "../components/BackButton";
 import { apiRequest } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
-// =====================================================
-// NORMALIZE CERTIFICATE
-// Backend may return snake_case.
-// Frontend uses camelCase.
-// =====================================================
 
-function normalizeCertificate(raw = {}) {
-  return {
-    id: raw.id ?? null,
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    certificateNo:
-      raw.certificateNo ??
-      raw.certificate_no ??
-      "",
+/* =========================================================
+   EXTRACT VERIFICATION TOKEN
+========================================================= */
 
-    recipientName:
-      raw.recipientName ??
-      raw.recipient_name ??
-      "",
+const extractToken = (value) => {
+  if (!value) return null;
 
-    courseName:
-      raw.courseName ??
-      raw.course_name ??
-      "",
+  const input = String(value).trim();
 
-    issuerName:
-      raw.issuerName ??
-      raw.issuer_name ??
-      "",
-
-    issueDate:
-      raw.issueDate ??
-      raw.issue_date ??
-      "",
-
-    verificationToken:
-      raw.verificationToken ??
-      raw.verification_token ??
-      "",
-
-    status:
-      raw.status ??
-      "issued",
-
-    createdAt:
-      raw.createdAt ??
-      raw.created_at ??
-      "",
-
-    revokedAt:
-      raw.revokedAt ??
-      raw.revoked_at ??
-      "",
-  };
-}
-
-// =====================================================
-// UUID VALIDATION
-// =====================================================
-
-function isValidUUID(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
-}
-
-// =====================================================
-// EXTRACT TOKEN
-// Supports:
-// 1. Full verification URL
-// 2. Raw UUID
-// =====================================================
-
-function extractToken(value) {
-  if (!value) {
-    return "";
+  // Raw UUID
+  if (UUID_REGEX.test(input)) {
+    return input;
   }
 
-  const cleanValue = value.trim();
-
-  // ---------------------------------------------------
-  // Try as URL
-  // ---------------------------------------------------
-
+  // Full verification URL
   try {
-    const parsedUrl = new URL(cleanValue);
+    const url = new URL(input);
+    const token = url.searchParams.get("token");
 
-    const urlToken =
-      parsedUrl.searchParams.get("token");
-
-    if (urlToken) {
-      return urlToken.trim();
+    if (token && UUID_REGEX.test(token)) {
+      return token;
     }
   } catch {
-    // Not a URL.
+    // Not a URL
   }
 
-  // ---------------------------------------------------
-  // Otherwise assume raw UUID
-  // ---------------------------------------------------
+  return null;
+};
 
-  return cleanValue;
-}
+/* =========================================================
+   NORMALIZE API RESPONSE
+========================================================= */
 
-// =====================================================
-// MAIN COMPONENT
-// =====================================================
+const normalizeResult = (result) => {
+  const certificate = result?.certificate || null;
+
+  return {
+    status: result?.status || certificate?.status || "invalid",
+
+    valid: Boolean(result?.valid),
+
+    message:
+      result?.message ||
+      "This certificate could not be verified against our official records.",
+
+    certificateNo:
+      certificate?.certificate_no ||
+      certificate?.certificateNo ||
+      null,
+  };
+};
+
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export default function VerifyCertificate() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+const navigate = useNavigate();
+  const [verificationResult, setVerificationResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [manualToken, setManualToken] = useState("");
 
-  const [searchParams] =
-    useSearchParams();
+  /* =========================================================
+     VERIFY CERTIFICATE
+  ========================================================= */
 
-  // ===================================================
-  // STATE
-  // ===================================================
+  const verifyCertificate = async (value) => {
+    if (loading) return;
 
-  const initialToken =
-    searchParams.get("token") || "";
+    setError("");
+    setVerificationResult(null);
 
-  const [token, setToken] =
-    useState(initialToken);
+    const token = extractToken(value);
 
-  const [certificate, setCertificate] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [manualToken, setManualToken] =
-    useState(initialToken);
-
-  // =====================================================
-  // VERIFY CERTIFICATE
-  // =====================================================
-
-  async function verifyCertificate(value) {
-    // ---------------------------------------------------
-    // EXTRACT TOKEN
-    // ---------------------------------------------------
-
-    const extractedToken =
-      extractToken(value);
-
-    if (!extractedToken) {
+    if (!token) {
       setError(
-        "Please scan a valid certificate QR code."
+        "Invalid verification QR code or token. Please scan a valid company certificate QR code.",
       );
       return;
     }
 
-    // ---------------------------------------------------
-    // VALIDATE UUID
-    // ---------------------------------------------------
-
-    if (!isValidUUID(extractedToken)) {
-      setCertificate(null);
-
-      setError(
-        "Invalid certificate verification token."
-      );
-
-      return;
-    }
+    setLoading(true);
 
     try {
-      setLoading(true);
-      setError("");
-      setCertificate(null);
-
-      console.log(
-        "================================="
+      const result = await apiRequest(
+        `/verify/${encodeURIComponent(token)}`,
       );
 
-      console.log(
-        "VERIFY TOKEN:",
-        extractedToken
-      );
+      const normalized = normalizeResult(result);
 
-      console.log(
-        "VERIFY API:",
-        `/verify/${encodeURIComponent(
-          extractedToken
-        )}`
-      );
-
-      console.log(
-        "================================="
-      );
-
-      // -------------------------------------------------
-      // CALL BACKEND
-      // -------------------------------------------------
-
-      const result =
-        await apiRequest(
-          `/verify/${encodeURIComponent(
-            extractedToken
-          )}`,
-          {
-            method: "GET",
-          }
-        );
-
-      console.log(
-        "VERIFY RESULT:",
-        result
-      );
-
-      // -------------------------------------------------
-      // CERTIFICATE NOT RETURNED
-      // -------------------------------------------------
-
-      if (!result) {
-        throw new Error(
-          "No verification response received."
-        );
-      }
-
-      if (!result.certificate) {
-        throw new Error(
-          result.message ||
-            result.error ||
-            "Certificate was not found."
-        );
-      }
-
-      // -------------------------------------------------
-      // NORMALIZE
-      // -------------------------------------------------
-
-      const normalizedCertificate =
-        normalizeCertificate(
-          result.certificate
-        );
-
-      console.log(
-        "NORMALIZED CERTIFICATE:",
-        normalizedCertificate
-      );
-
-      // -------------------------------------------------
-      // SAVE TOKEN
-      // -------------------------------------------------
-
-      setToken(
-        extractedToken
-      );
-
-      setManualToken(
-        extractedToken
-      );
-
-      // -------------------------------------------------
-      // SAVE CERTIFICATE
-      // -------------------------------------------------
-
-      setCertificate(
-        normalizedCertificate
-      );
-
-      console.log(
-        "Certificate verification request completed."
-      );
-
+      setVerificationResult(normalized);
+      setManualToken("");
     } catch (err) {
-      console.error(
-        "VERIFY ERROR:",
-        err
-      );
-
-      setCertificate(null);
-
-      setError(
-        err?.message ||
-          "Certificate verification failed."
-      );
-
+      /*
+       * The public verification endpoint can return 404
+       * when the certificate token does not exist.
+       *
+       * For the user, this should simply mean INVALID.
+       */
+      setVerificationResult({
+        status: "invalid",
+        valid: false,
+        message:
+          err?.message ||
+          "This certificate could not be verified against our official company records.",
+        certificateNo: null,
+      });
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  // =====================================================
-  // AUTO VERIFY TOKEN FROM URL
-  // =====================================================
+  /* =========================================================
+     AUTO VERIFY TOKEN FROM URL
+  ========================================================= */
 
   useEffect(() => {
-    const urlToken =
-      searchParams.get("token");
+    const tokenFromUrl = searchParams.get("token");
 
-    if (!urlToken) {
-      return;
+    if (tokenFromUrl) {
+      verifyCertificate(tokenFromUrl);
     }
+  }, [searchParams]);
 
-    setToken(urlToken);
-    setManualToken(urlToken);
+  /* =========================================================
+     MANUAL SUBMIT
+  ========================================================= */
 
-    verifyCertificate(urlToken);
-
-    // We intentionally run this only once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // =====================================================
-  // MANUAL VERIFICATION
-  // =====================================================
-
-  function handleManualVerify(event) {
+  const handleManualSubmit = async (event) => {
     event.preventDefault();
 
-    verifyCertificate(
-      manualToken
-    );
-  }
-
-  // =====================================================
-  // QR SCANNER
-  // =====================================================
-
-  function handleScanResult(
-    scannedValue
-  ) {
-    if (!scannedValue) {
+    if (!manualToken.trim()) {
+      setError("Please enter a verification token.");
       return;
     }
 
-    const cleanValue =
-      scannedValue.trim();
+    await verifyCertificate(manualToken);
+  };
 
-    console.log(
-      "QR SCANNED:",
-      cleanValue
-    );
+  /* =========================================================
+     QR SCANNER RESULT
+  ========================================================= */
 
-    verifyCertificate(
-      cleanValue
-    );
-  }
+  const handleScan = async (value) => {
+    if (!value || loading) return;
 
-  // =====================================================
-  // RESET VERIFICATION
-  // =====================================================
+    await verifyCertificate(value);
+  };
 
-  function resetVerification() {
-    setCertificate(null);
+  /* =========================================================
+     RESET
+  ========================================================= */
+
+  const handleReset = () => {
+    setVerificationResult(null);
     setError("");
     setManualToken("");
-    setToken("");
 
-    // Remove token from browser URL
-    navigate(
-      "/verify",
-      {
-        replace: true,
-      }
-    );
-  }
+    window.history.replaceState({}, "", "/verify");
+  };
 
-  // =====================================================
-  // FORMAT DATE
-  // =====================================================
+  /* =========================================================
+     STATUS HELPERS
+  ========================================================= */
 
-  function formatDate(date) {
-    if (!date) {
-      return "-";
-    }
+  const isValid = verificationResult?.status === "valid";
 
-    const parsedDate =
-      new Date(date);
+  const isRevoked = verificationResult?.status === "revoked";
 
-    if (
-      Number.isNaN(
-        parsedDate.getTime()
-      )
-    ) {
-      return date;
-    }
-
-    return parsedDate.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }
-    );
-  }
-
-  // =====================================================
-  // UI
-  // =====================================================
+  const isInvalid = verificationResult?.status === "invalid";
 
   return (
-    <div className="min-h-screen w-full bg-[#060a0f] px-4 py-8 text-white sm:px-6 lg:px-8">
-
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
 
-        {/* =================================================
-            BACK BUTTON
-        ================================================= */}
 
-        <div className="mb-7">
-          <BackButton
-            text="Back to Dashboard"
-            to="/dashboard"
-          />
-        </div>
+<button
+  type="button"
+  onClick={() => navigate("/dashboard")}
+  className="mb-5 inline-flex items-center gap-2 rounded-lg border border-cyan-400/25 bg-cyan-400/5 px-4 py-2.5 text-sm font-bold text-cyan-400 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-400/45 hover:bg-cyan-400/10 hover:text-cyan-300 active:translate-y-0"
+>
+  <ArrowLeft size={17} />
+  <span>Back to Dashboard</span>
+</button>
 
-        {/* =================================================
+        {/* =====================================================
             HEADER
-        ================================================= */}
+        ===================================================== */}
 
-        <div className="mb-8 text-center">
-
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10">
-
-            <ShieldCheck
-              size={32}
-              className="text-cyan-400"
-            />
-
+        <header className="mb-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 shadow-lg shadow-cyan-500/10">
+              <ShieldCheck className="h-9 w-9 text-cyan-400" />
+            </div>
           </div>
 
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+          <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-400">
+            Company Verification
+          </p>
+
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Certificate Verification
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-            Scan the certificate QR code or
-            enter the verification token to
-            verify certificate authenticity.
+            Verify the authenticity of a company-issued certificate using its
+            official QR code or verification token.
           </p>
+        </header>
 
-        </div>
+        {/* =====================================================
+            VERIFICATION RESULT
+        ===================================================== */}
 
-        {/* =================================================
-            VERIFICATION FORM
-        ================================================= */}
+        {verificationResult ? (
+          <section className="mx-auto max-w-2xl">
 
-        {!certificate && (
+            {/* =================================================
+                VALID
+            ================================================= */}
 
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/3 shadow-2xl">
+            {isValid && (
+              <div className="overflow-hidden rounded-3xl border border-emerald-400/20 bg-slate-900 shadow-2xl shadow-emerald-950/20">
 
-            {/* HEADER */}
+                <div className="border-b border-emerald-400/10 bg-emerald-400/5 px-6 py-10 text-center sm:px-10">
 
-            <div className="border-b border-white/10 px-5 py-5 sm:px-7">
+                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-400/10 ring-8 ring-emerald-400/5">
+                    <ShieldCheck className="h-11 w-11 text-emerald-400" />
+                  </div>
 
-              <div className="flex items-center gap-3">
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">
+                    Certificate Verified
+                  </p>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
+                  <h2 className="text-2xl font-bold sm:text-3xl">
+                    Certificate is Authentic
+                  </h2>
 
-                  <ScanLine
-                    size={22}
-                  />
+                  <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
+                    This certificate has been successfully verified against
+                    our official company records.
+                  </p>
+                </div>
 
+                <div className="space-y-5 p-6 sm:p-8">
+
+                  {/* STATUS */}
+
+                  <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/5 p-5 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Verification Status
+                    </p>
+
+                    <p className="mt-2 text-2xl font-bold text-emerald-400">
+                      VALID
+                    </p>
+                  </div>
+
+                  {/* CERTIFICATE NUMBER */}
+
+                  {verificationResult.certificateNo && (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        Certificate Number
+                      </p>
+
+                      <p className="mt-2 break-all font-mono text-sm font-semibold text-slate-200">
+                        {verificationResult.certificateNo}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* SECURITY MESSAGE */}
+
+                  <div className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                    <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
+
+                    <p className="text-sm leading-6 text-slate-400">
+                      This verification result is provided directly from the
+                      company&apos;s official certificate records.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =================================================
+                REVOKED
+            ================================================= */}
+
+            {isRevoked && (
+              <div className="overflow-hidden rounded-3xl border border-amber-400/20 bg-slate-900 shadow-2xl shadow-amber-950/20">
+
+                <div className="border-b border-amber-400/10 bg-amber-400/5 px-6 py-10 text-center sm:px-10">
+
+                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-amber-400/10 ring-8 ring-amber-400/5">
+                    <ShieldX className="h-11 w-11 text-amber-400" />
+                  </div>
+
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-amber-400">
+                    Certificate Revoked
+                  </p>
+
+                  <h2 className="text-2xl font-bold sm:text-3xl">
+                    Certificate is No Longer Valid
+                  </h2>
+
+                  <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
+                    This certificate has been revoked and is no longer
+                    considered valid by the company.
+                  </p>
+                </div>
+
+                <div className="space-y-5 p-6 sm:p-8">
+
+                  <div className="rounded-2xl border border-amber-400/10 bg-amber-400/5 p-5 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Verification Status
+                    </p>
+
+                    <p className="mt-2 text-2xl font-bold text-amber-400">
+                      REVOKED
+                    </p>
+                  </div>
+
+                  {verificationResult.certificateNo && (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                        Certificate Number
+                      </p>
+
+                      <p className="mt-2 break-all font-mono text-sm font-semibold text-slate-200">
+                        {verificationResult.certificateNo}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* =================================================
+                INVALID
+            ================================================= */}
+
+            {isInvalid && (
+              <div className="overflow-hidden rounded-3xl border border-red-400/20 bg-slate-900 shadow-2xl shadow-red-950/20">
+
+                <div className="border-b border-red-400/10 bg-red-400/5 px-6 py-10 text-center sm:px-10">
+
+                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-red-400/10 ring-8 ring-red-400/5">
+                    <ShieldX className="h-11 w-11 text-red-400" />
+                  </div>
+
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-red-400">
+                    Certificate Not Verified
+                  </p>
+
+                  <h2 className="text-2xl font-bold sm:text-3xl">
+                    Certificate Could Not Be Verified
+                  </h2>
+
+                  <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
+                    This certificate could not be verified against our
+                    official company records.
+                  </p>
+                </div>
+
+                <div className="p-6 sm:p-8">
+
+                  <div className="rounded-2xl border border-red-400/10 bg-red-400/5 p-5 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Verification Status
+                    </p>
+
+                    <p className="mt-2 text-2xl font-bold text-red-400">
+                      INVALID
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =================================================
+                RESET
+            ================================================= */}
+
+            <button
+              type="button"
+              onClick={handleReset}
+              className="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-cyan-400/40 hover:text-cyan-400"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Verify Another Certificate
+            </button>
+          </section>
+        ) : (
+          /* ===================================================
+             VERIFICATION INPUT AREA
+          =================================================== */
+
+          <section className="grid gap-6 lg:grid-cols-2">
+
+            {/* =================================================
+                QR SCANNER
+            ================================================= */}
+
+            <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-8">
+
+              <div className="mb-6 flex items-center gap-3">
+
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10">
+                  <ScanLine className="h-6 w-6 text-cyan-400" />
                 </div>
 
                 <div>
-
                   <h2 className="text-lg font-bold">
                     Scan Certificate QR
                   </h2>
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Point your camera at the
-                    certificate QR code.
+                  <p className="text-sm text-slate-500">
+                    Use the official QR code printed on the certificate.
                   </p>
-
                 </div>
-
               </div>
 
+              <QRScanner onScan={handleScan} />
+
+              {loading && (
+                <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-4 py-3 text-center text-sm text-cyan-400">
+                  Verifying certificate...
+                </div>
+              )}
             </div>
 
-            <div className="p-5 sm:p-7">
+            {/* =================================================
+                MANUAL TOKEN
+            ================================================= */}
 
-              {/* =================================================
-                  QR SCANNER
-              ================================================= */}
+            <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-8">
 
-              <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="mb-6 flex items-center gap-3">
 
-                <QRScanner
-                  onScan={
-                    handleScanResult
-                  }
-                />
-
-              </div>
-
-              {/* =================================================
-                  OR
-              ================================================= */}
-
-              <div className="my-7 flex items-center gap-4">
-
-                <div className="h-px flex-1 bg-white/10" />
-
-                <span className="rounded-full border border-white/10 bg-white/3 px-4 py-1.5 text-xs font-semibold text-slate-500">
-                  OR
-                </span>
-
-                <div className="h-px flex-1 bg-white/10" />
-
-              </div>
-
-              {/* =================================================
-                  MANUAL TOKEN
-              ================================================= */}
-
-              <div>
-
-                <div className="mb-3">
-
-                  <h3 className="text-sm font-semibold text-white">
-                    Enter Verification Token
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Enter the unique certificate
-                    verification token manually.
-                  </p>
-
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10">
+                  <Search className="h-6 w-6 text-cyan-400" />
                 </div>
 
-                <form
-                  onSubmit={
-                    handleManualVerify
-                  }
-                  className="flex flex-col gap-3 sm:flex-row"
-                >
+                <div>
+                  <h2 className="text-lg font-bold">
+                    Manual Verification
+                  </h2>
 
-                  <input
-                    type="text"
-                    value={manualToken}
-                    onChange={(event) =>
-                      setManualToken(
-                        event.target.value
-                      )
-                    }
-                    placeholder="Enter verification token"
-                    className="h-12 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/60"
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-
-                    <Search
-                      size={18}
-                    />
-
-                    {loading
-                      ? "Verifying..."
-                      : "Verify Certificate"}
-
-                  </button>
-
-                </form>
-
+                  <p className="text-sm text-slate-500">
+                    Enter the certificate verification token.
+                  </p>
+                </div>
               </div>
 
-              {/* =================================================
-                  ERROR
-              ================================================= */}
+              <form onSubmit={handleManualSubmit} className="space-y-4">
+
+                <label
+                  htmlFor="verification-token"
+                  className="block text-sm font-medium text-slate-300"
+                >
+                  Verification Token
+                </label>
+
+                <input
+                  id="verification-token"
+                  type="text"
+                  value={manualToken}
+                  onChange={(event) => {
+                    setManualToken(event.target.value);
+                    setError("");
+                  }}
+                  placeholder="Enter verification token"
+                  autoComplete="off"
+                  spellCheck="false"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Search className="h-4 w-4" />
+
+                  {loading ? "Verifying..." : "Verify Certificate"}
+                </button>
+              </form>
 
               {error && (
+                <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/5 p-4">
+                  <div className="flex items-start gap-3">
 
-                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+                    <ShieldX className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
 
-                  <ShieldX
-                    size={20}
-                    className="mt-0.5 shrink-0 text-red-400"
-                  />
-
-                  <div>
-
-                    <p className="font-semibold">
-                      Verification Failed
-                    </p>
-
-                    <p className="mt-1 leading-6 text-red-300/80">
+                    <p className="text-sm leading-6 text-red-300">
                       {error}
                     </p>
 
                   </div>
-
                 </div>
-
               )}
-
             </div>
-
-          </div>
-
+          </section>
         )}
 
-        {/* =================================================
-            VERIFIED / REVOKED CERTIFICATE
-        ================================================= */}
+        {/* =====================================================
+            SECURITY INFORMATION
+        ===================================================== */}
 
-        {certificate && (
+        <section className="mt-8 grid gap-4 sm:grid-cols-3">
 
-          <div
-            className={`overflow-hidden rounded-2xl border p-8 text-center shadow-2xl ${
-              certificate.status
-                ?.toLowerCase() === "issued"
-                ? "border-emerald-400/20 bg-emerald-400/6"
-                : "border-red-400/20 bg-red-400/6"
-            }`}
-          >
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-center">
+            <ShieldCheck className="mx-auto mb-3 h-6 w-6 text-cyan-400" />
 
-            {/* =================================================
-                ISSUED
-            ================================================= */}
+            <h3 className="text-sm font-semibold">
+              Official Records
+            </h3>
 
-            {certificate.status
-              ?.toLowerCase() ===
-            "issued" ? (
-
-              <>
-
-                {/* ICON */}
-
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-400/10">
-
-                  <ShieldCheck
-                    size={45}
-                    className="text-emerald-400"
-                  />
-
-                </div>
-
-                {/* TITLE */}
-
-                <h2 className="mt-6 text-2xl font-extrabold text-emerald-400 sm:text-3xl">
-                  Certificate Verified
-                </h2>
-
-                <p className="mt-3 text-sm text-slate-400">
-                  Certificate authenticity has
-                  been successfully verified.
-                </p>
-
-                {/* CERTIFICATE NUMBER */}
-
-                <div className="mx-auto mt-6 max-w-md rounded-xl border border-white/10 bg-black/20 px-5 py-4">
-
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Certificate Number
-                  </p>
-
-                  <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
-                    {certificate.certificateNo ||
-                      "-"}
-                  </p>
-
-                </div>
-
-                {/* DETAILS */}
-
-                <div className="mt-6 grid gap-3 text-left sm:grid-cols-2">
-
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-
-                    <p className="text-xs text-slate-500">
-                      Recipient
-                    </p>
-
-                    <p className="mt-1 font-semibold text-white">
-                      {certificate.recipientName ||
-                        "-"}
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-
-                    <p className="text-xs text-slate-500">
-                      Course
-                    </p>
-
-                    <p className="mt-1 font-semibold text-white">
-                      {certificate.courseName ||
-                        "-"}
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-
-                    <p className="text-xs text-slate-500">
-                      Issuer
-                    </p>
-
-                    <p className="mt-1 font-semibold text-white">
-                      {certificate.issuerName ||
-                        "-"}
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-
-                    <p className="text-xs text-slate-500">
-                      Issue Date
-                    </p>
-
-                    <p className="mt-1 font-semibold text-white">
-                      {formatDate(
-                        certificate.issueDate
-                      )}
-                    </p>
-
-                  </div>
-
-                  <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/5 p-4 sm:col-span-2">
-
-                    <p className="text-xs text-slate-500">
-                      Status
-                    </p>
-
-                    <p className="mt-1 font-semibold capitalize text-emerald-400">
-                      {certificate.status ||
-                        "issued"}
-                    </p>
-
-                  </div>
-
-                </div>
-
-                {/* =================================================
-                    VIEW CERTIFICATE
-                ================================================= */}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/certificate/view?token=${encodeURIComponent(
-                        token
-                      )}`
-                    )
-                  }
-                  className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
-                >
-
-                  View Certificate
-
-                  <ArrowRight
-                    size={16}
-                  />
-
-                </button>
-
-                {/* =================================================
-                    VERIFY ANOTHER
-                ================================================= */}
-
-                <div>
-
-                  <button
-                    type="button"
-                    onClick={
-                      resetVerification
-                    }
-                    className="mt-4 text-sm text-slate-500 hover:text-cyan-400"
-                  >
-                    Verify Another Certificate
-                  </button>
-
-                </div>
-
-              </>
-
-            ) : (
-
-              /* =================================================
-                 REVOKED
-              ================================================= */
-
-              <>
-
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-red-400/20 bg-red-400/10">
-
-                  <ShieldX
-                    size={45}
-                    className="text-red-400"
-                  />
-
-                </div>
-
-                <h2 className="mt-6 text-2xl font-extrabold text-red-400">
-                  Certificate Revoked
-                </h2>
-
-                <p className="mx-auto mt-3 max-w-lg text-sm text-slate-400">
-                  This certificate is no longer
-                  valid.
-                </p>
-
-                <div className="mx-auto mt-6 max-w-md rounded-xl border border-red-400/10 bg-black/20 px-5 py-4">
-
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Certificate Number
-                  </p>
-
-                  <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
-                    {certificate.certificateNo ||
-                      "-"}
-                  </p>
-
-                </div>
-
-                <div className="mx-auto mt-4 max-w-md rounded-xl border border-white/10 bg-black/20 px-5 py-4">
-
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Status
-                  </p>
-
-                  <p className="mt-1 font-semibold capitalize text-red-400">
-                    {certificate.status ||
-                      "revoked"}
-                  </p>
-
-                </div>
-
-                <button
-                  type="button"
-                  onClick={
-                    resetVerification
-                  }
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-white/4 px-5 text-sm font-semibold text-white transition hover:bg-white/8"
-                >
-                  Verify Another Certificate
-                </button>
-
-              </>
-
-            )}
-
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Verification is checked against official company records.
+            </p>
           </div>
 
-        )}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-center">
+            <LockKeyhole className="mx-auto mb-3 h-6 w-6 text-cyan-400" />
 
-        {/* =================================================
-            SECURITY CARDS
-        ================================================= */}
+            <h3 className="text-sm font-semibold">
+              Secure Verification
+            </h3>
 
-        {!certificate && (
-
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-            <SecurityCard
-              title="Secure Verification"
-              text="Certificate details are checked directly against the verification server."
-            />
-
-            <SecurityCard
-              title="Unique Token"
-              text="Every certificate uses a unique verification token."
-            />
-
-            <SecurityCard
-              title="QR Enabled"
-              text="Scan the certificate QR code for quick verification."
-            />
-
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Each certificate uses a unique verification token.
+            </p>
           </div>
 
-        )}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 text-center">
+            <ScanLine className="mx-auto mb-3 h-6 w-6 text-cyan-400" />
 
-        {/* =================================================
+            <h3 className="text-sm font-semibold">
+              Public Verification
+            </h3>
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              No employee login is required to verify a certificate.
+            </p>
+          </div>
+        </section>
+
+        {/* =====================================================
             FOOTER
-        ================================================= */}
+        ===================================================== */}
 
-        <div className="mt-8 pb-5 text-center">
-
+        <footer className="mt-10 border-t border-slate-800 pt-6 text-center">
           <p className="text-xs text-slate-600">
-            CertiVerify • Secure Certificate Verification
+            Certificate verification is provided by the official company
+            verification system.
           </p>
-
-        </div>
-
+        </footer>
       </div>
-
-    </div>
+    </main>
   );
 }
 
-// =====================================================
-// SECURITY CARD
-// =====================================================
-
-function SecurityCard({
-  title,
-  text,
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/2.5 p-5">
-
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-400">
-
-        <ShieldCheck
-          size={18}
-        />
-
-      </div>
-
-      <h3 className="text-sm font-bold text-white">
-        {title}
-      </h3>
-
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        {text}
-      </p>
-
-    </div>
-  );
-}

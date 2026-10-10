@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.49.0",
     "qrcode": "^1.5.4",
@@ -19,6 +21,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4",
+    "socket.io": "^4.8.4",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {

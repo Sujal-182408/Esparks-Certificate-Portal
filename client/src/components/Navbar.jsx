@@ -41,7 +41,7 @@ export default function Navbar() {
           </span>
 
           <span className="text-lg font-bold tracking-tight text-white">
-            Certi<span className="text-cyan-400">Verify</span>
+            ESPARKS<span className="text-cyan-400">IT SOLUTIONS</span>
           </span>
         </Link>
 

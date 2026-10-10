@@ -501,24 +501,16 @@ export default function EmployeeDetails() {
 
           </div>
 
-
-          <div className="employee-summary-card">
-
-            <div className="employee-summary-icon employee-issued-icon">
-              <CheckCircle2 size={22} />
-            </div>
-
-            <div>
-              <span>
-                Issued
-              </span>
-
-              <strong>
-                {certificateStats.issued}
-              </strong>
-            </div>
-
-          </div>
+<button
+  type="button"
+  onClick={() =>
+    navigate(
+      `/admin/certificates/create?requestId=${request.id}`
+    )
+  }
+>
+  Issue
+</button>
 
 
           <div className="employee-summary-card">

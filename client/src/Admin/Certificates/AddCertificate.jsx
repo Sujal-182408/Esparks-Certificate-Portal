@@ -1,44 +1,253 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
 import {
   Award,
   CalendarDays,
   Building2,
-  Mail,
   CheckCircle,
   AlertCircle,
-  UserRound,
   FileCheck2,
+  Loader2,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 
 import BackButton from "../../components/BackButton";
 
 const API_URL = "/api";
 
+const CERTIFICATE_TYPES = [
+  {
+    value: "CERT",
+    label: "Certificate",
+  },
+  {
+    value: "INTR",
+    label: "Internship",
+  },
+];
+
+/* ============================================================
+   CREATE CERTIFICATE
+============================================================ */
+
 export default function AddCertificate() {
   const navigate = useNavigate();
 
+  const [searchParams] = useSearchParams();
+
+  /*
+   * IMPORTANT:
+   *
+   * requestId identifies the certificate request.
+   *
+   * It is NOT the certificate ID.
+   *
+   * Example:
+   *
+   * /admin/certificates/create?requestId=123
+   */
+
+  const requestId = useMemo(() => {
+    const value = searchParams.get("requestId");
+
+    if (!value) {
+      return "";
+    }
+
+    return value.trim();
+  }, [searchParams]);
+
+  /* ==========================================================
+     REQUEST ID VALIDATION
+  ========================================================== */
+
+  const validRequestId = useMemo(() => {
+    return /^[1-9]\d*$/.test(requestId);
+  }, [requestId]);
+
+  /* ==========================================================
+     FORM
+  ========================================================== */
+
   const [form, setForm] = useState({
     certificateType: "CERT",
-    employeeEmail: "",
     courseName: "",
     issuerName: "eSparks IT Solutions",
     issueDate: "",
   });
 
+  /* ==========================================================
+     REQUEST INFORMATION
+  ========================================================== */
+
+  const [request, setRequest] = useState(null);
+
+  const [requestLoading, setRequestLoading] =
+    useState(false);
+
+  const [requestError, setRequestError] =
+    useState("");
+
+  /* ==========================================================
+     CREATE STATE
+  ========================================================== */
+
   const [loading, setLoading] = useState(false);
+
   const [success, setSuccess] = useState("");
+
   const [error, setError] = useState("");
+
   const [createdCertificate, setCreatedCertificate] =
     useState(null);
 
-  // =====================================================
-  // HANDLE INPUT
-  // =====================================================
+  /* ==========================================================
+     LOAD CERTIFICATE REQUEST
+  ========================================================== */
 
-  function handleChange(e) {
-    const { name, value } = e.target;
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRequest() {
+      if (!requestId || !validRequestId) {
+        return;
+      }
+
+      try {
+        setRequestLoading(true);
+        setRequestError("");
+
+        /*
+         * This endpoint should return the request
+         * from the database.
+         *
+         * The backend must resolve the employee
+         * using requestId.
+         */
+
+        const response = await fetch(
+          `${API_URL}/admin/certificate-requests/${encodeURIComponent(
+            requestId
+          )}`,
+          {
+            method: "GET",
+
+            credentials: "include",
+
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+
+        const data = await response
+          .json()
+          .catch(() => ({}));
+
+        if (!mounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          throw new Error(
+            "Admin authentication required. Please login again."
+          );
+        }
+
+        if (response.status === 403) {
+          throw new Error(
+            data?.message ||
+              "You are not authorized to view this certificate request."
+          );
+        }
+
+        if (response.status === 404) {
+          throw new Error(
+            data?.message ||
+              "Certificate request was not found."
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message ||
+              "Failed to load certificate request."
+          );
+        }
+
+        const loadedRequest =
+          data?.request || null;
+
+        if (!loadedRequest?.id) {
+          throw new Error(
+            "Certificate request information could not be loaded."
+          );
+        }
+
+        /*
+         * Security:
+         *
+         * Employee information comes from the
+         * backend/database, not from the URL.
+         */
+
+        setRequest(loadedRequest);
+
+        /*
+         * Prefill certificate information from
+         * the actual request.
+         */
+
+        setForm((previous) => ({
+          ...previous,
+
+          certificateType:
+            loadedRequest.certificate_type ||
+            previous.certificateType,
+
+          courseName:
+            loadedRequest.course_name ||
+            previous.courseName,
+        }));
+      } catch (err) {
+        console.error(
+          "Load certificate request error:",
+          err
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        setRequestError(
+          err?.message ||
+            "Unable to load the certificate request."
+        );
+      } finally {
+        if (mounted) {
+          setRequestLoading(false);
+        }
+      }
+    }
+
+    loadRequest();
+
+    return () => {
+      mounted = false;
+    };
+  }, [requestId, validRequestId]);
+
+  /* ==========================================================
+     HANDLE INPUT
+  ========================================================== */
+
+  function handleChange(event) {
+    const { name, value } = event.target;
 
     setForm((previous) => ({
       ...previous,
@@ -50,22 +259,16 @@ export default function AddCertificate() {
     setCreatedCertificate(null);
   }
 
-  // =====================================================
-  // VALIDATE EMAIL
-  // =====================================================
+  /* ==========================================================
+     HANDLE SUBMIT
+  ========================================================== */
 
-  function isValidEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      email
-    );
-  }
+  async function handleSubmit(event) {
+    event.preventDefault();
 
-  // =====================================================
-  // HANDLE SUBMIT
-  // =====================================================
-
-  async function handleSubmit(e) {
-    e.preventDefault();
+    if (loading) {
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -73,36 +276,95 @@ export default function AddCertificate() {
     setCreatedCertificate(null);
 
     try {
-      // =================================================
-      // CLEAN VALUES
-      // =================================================
+      /* ======================================================
+         REQUEST ID
+      ====================================================== */
+
+      if (!requestId) {
+        throw new Error(
+          "Certificate request ID is missing."
+        );
+      }
+
+      if (!validRequestId) {
+        throw new Error(
+          "Invalid certificate request ID."
+        );
+      }
+
+      /* ======================================================
+         REQUEST MUST BE LOADED
+      ====================================================== */
+
+      if (!request?.id) {
+        throw new Error(
+          "Certificate request information is not available."
+        );
+      }
+
+      /*
+       * Extra protection:
+       *
+       * Make sure the request loaded from the backend
+       * matches the request ID in the URL.
+       */
+
+      if (
+        Number(request.id) !==
+        Number(requestId)
+      ) {
+        throw new Error(
+          "Certificate request validation failed."
+        );
+      }
+
+      /* ======================================================
+         REQUEST STATUS
+      ====================================================== */
+
+      if (
+        request.status &&
+        request.status !== "pending"
+      ) {
+        throw new Error(
+          `This certificate request is already ${request.status}.`
+        );
+      }
+
+      /* ======================================================
+         CLEAN VALUES
+      ====================================================== */
 
       const certificateType =
-        form.certificateType
+        String(
+          form.certificateType || ""
+        )
           .trim()
           .toUpperCase();
 
-      const employeeEmail =
-        form.employeeEmail
-          .trim()
-          .toLowerCase();
-
       const courseName =
-        form.courseName.trim();
+        String(
+          form.courseName || ""
+        ).trim();
 
       const issuerName =
-        form.issuerName.trim();
+        String(
+          form.issuerName || ""
+        ).trim();
 
       const issueDate =
-        form.issueDate;
+        String(
+          form.issueDate || ""
+        ).trim();
 
-      // =================================================
-      // CERTIFICATE TYPE VALIDATION
-      // =================================================
+      /* ======================================================
+         CERTIFICATE TYPE
+      ====================================================== */
 
       if (
-        !["CERT", "INTR"].includes(
-          certificateType
+        !CERTIFICATE_TYPES.some(
+          (item) =>
+            item.value === certificateType
         )
       ) {
         throw new Error(
@@ -110,25 +372,9 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // EMPLOYEE EMAIL VALIDATION
-      // =================================================
-
-      if (!employeeEmail) {
-        throw new Error(
-          "Employee Gmail is required."
-        );
-      }
-
-      if (!isValidEmail(employeeEmail)) {
-        throw new Error(
-          "Please enter a valid employee Gmail."
-        );
-      }
-
-      // =================================================
-      // COURSE VALIDATION
-      // =================================================
+      /* ======================================================
+         COURSE
+      ====================================================== */
 
       if (!courseName) {
         throw new Error(
@@ -142,9 +388,9 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // ISSUER VALIDATION
-      // =================================================
+      /* ======================================================
+         ISSUER
+      ====================================================== */
 
       if (!issuerName) {
         throw new Error(
@@ -158,9 +404,9 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // ISSUE DATE VALIDATION
-      // =================================================
+      /* ======================================================
+         DATE
+      ====================================================== */
 
       if (!issueDate) {
         throw new Error(
@@ -168,21 +414,33 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // CREATE CERTIFICATE
-      //
-      // IMPORTANT:
-      //
-      // certificateNo is NOT sent.
-      //
-      // employeeId is NOT sent.
-      //
-      // recipientName is NOT sent.
-      //
-      // Backend generates certificateNo.
-      // Backend finds employee by email.
-      // Backend gets recipient name from PostgreSQL.
-      // =================================================
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          issueDate
+        )
+      ) {
+        throw new Error(
+          "Issue date must be in YYYY-MM-DD format."
+        );
+      }
+
+      /* ======================================================
+         CREATE CERTIFICATE
+
+         SECURITY:
+
+         DO NOT SEND:
+
+         - employeeEmail
+         - employeeId
+         - recipientName
+         - certificateId
+         - certificateNo
+         - verificationToken
+
+         The backend resolves employee information
+         from requestId.
+      ====================================================== */
 
       const response = await fetch(
         `${API_URL}/admin/certificates`,
@@ -200,18 +458,23 @@ export default function AddCertificate() {
           },
 
           body: JSON.stringify({
+            requestId:
+              Number(requestId),
+
             certificateType,
-            employeeEmail,
+
             courseName,
+
             issuerName,
+
             issueDate,
           }),
         }
       );
 
-      // =================================================
-      // READ RESPONSE
-      // =================================================
+      /* ======================================================
+         RESPONSE
+      ====================================================== */
 
       const data =
         await response
@@ -224,9 +487,9 @@ export default function AddCertificate() {
         data
       );
 
-      // =================================================
-      // ADMIN SESSION EXPIRED
-      // =================================================
+      /* ======================================================
+         AUTHENTICATION
+      ====================================================== */
 
       if (response.status === 401) {
         throw new Error(
@@ -234,42 +497,56 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // EMPLOYEE NOT FOUND
-      // =================================================
-
-      if (response.status === 404) {
-        throw new Error(
-          data?.message ||
-            "No employee account exists with this Gmail."
-        );
-      }
-
-      // =================================================
-      // EMPLOYEE INACTIVE
-      // =================================================
+      /* ======================================================
+         FORBIDDEN
+      ====================================================== */
 
       if (response.status === 403) {
         throw new Error(
           data?.message ||
-            "This employee account is inactive."
+            "You are not authorized to create this certificate."
         );
       }
 
-      // =================================================
-      // DUPLICATE
-      // =================================================
+      /* ======================================================
+         NOT FOUND
+      ====================================================== */
+
+      if (response.status === 404) {
+        throw new Error(
+          data?.message ||
+            "Certificate request was not found."
+        );
+      }
+
+      /* ======================================================
+         CONFLICT
+      ====================================================== */
 
       if (response.status === 409) {
         throw new Error(
           data?.message ||
-            "Unable to create the certificate because a duplicate value exists."
+            "This certificate request has already been processed."
         );
       }
 
-      // =================================================
-      // OTHER SERVER ERROR
-      // =================================================
+      /* ======================================================
+         VALIDATION
+      ====================================================== */
+
+      if (
+        response.status === 400 ||
+        response.status === 422
+      ) {
+        throw new Error(
+          data?.message ||
+            "The certificate information is invalid."
+        );
+      }
+
+      /* ======================================================
+         OTHER SERVER ERROR
+      ====================================================== */
 
       if (!response.ok) {
         throw new Error(
@@ -279,31 +556,78 @@ export default function AddCertificate() {
         );
       }
 
-      // =================================================
-      // SUCCESS
-      // =================================================
+      /* ======================================================
+         SUCCESS
+      ====================================================== */
+
+      const certificate =
+        data?.certificate || null;
+
+      if (!certificate?.id) {
+        throw new Error(
+          "Certificate was created, but the server did not return a certificate ID."
+        );
+      }
+
+      /*
+       * Make sure the returned ID is a valid
+       * positive integer before using it
+       * in the admin URL.
+       */
+
+      const certificateId =
+        Number(certificate.id);
+
+      if (
+        !Number.isInteger(
+          certificateId
+        ) ||
+        certificateId <= 0
+      ) {
+        throw new Error(
+          "The server returned an invalid certificate ID."
+        );
+      }
 
       setSuccess(
         data?.message ||
-          "Certificate created successfully!"
+          "Certificate created successfully."
       );
 
       setCreatedCertificate(
-        data?.certificate || null
+        certificate
       );
 
-      // =================================================
-      // RESET FORM
-      // =================================================
+      /* ======================================================
+         IMPORTANT
 
-      setForm({
-        certificateType: "CERT",
-        employeeEmail: "",
-        courseName: "",
-        issuerName:
-          "eSparks IT Solutions",
-        issueDate: "",
-      });
+         requestId and certificateId are DIFFERENT.
+
+         We navigate using the actual certificate ID
+         returned by the backend.
+
+         Example:
+
+         requestId     = 123
+         certificateId = 87
+
+         Correct:
+
+         /admin/certificates/87
+
+         NOT:
+
+         /admin/certificates/123
+      ====================================================== */
+
+      navigate(
+        `/admin/certificates/${encodeURIComponent(
+          certificateId
+        )}`,
+        {
+          replace: true,
+        }
+      );
     } catch (err) {
       console.error(
         "Create certificate error:",
@@ -319,28 +643,174 @@ export default function AddCertificate() {
     }
   }
 
-  // =====================================================
-  // UI
-  // =====================================================
+  /* ==========================================================
+     INVALID REQUEST PAGE
+  ========================================================== */
+
+  if (!requestId || !validRequestId) {
+    return (
+      <main className="min-h-screen bg-midnight px-4 py-10 sm:px-6">
+        <div className="mx-auto w-full max-w-2xl">
+
+          <div className="mb-6">
+            <BackButton />
+          </div>
+
+          <section
+            aria-labelledby="invalid-request-title"
+            className="rounded-3xl border border-red-400/20 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
+          >
+            <div className="mb-5 inline-flex rounded-2xl bg-red-400/10 p-3 text-red-300">
+              <AlertCircle
+                size={30}
+                aria-hidden="true"
+              />
+            </div>
+
+            <h1
+              id="invalid-request-title"
+              className="text-2xl font-bold text-white"
+            >
+              Invalid Certificate Request
+            </h1>
+
+            <p className="mt-3 leading-6 text-slate-400">
+              This certificate creation page requires
+              a valid certificate request ID.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  "/admin/certificate-requests"
+                )
+              }
+              className="mt-6 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              Back to Certificate Requests
+            </button>
+          </section>
+
+        </div>
+      </main>
+    );
+  }
+
+  /* ==========================================================
+     LOADING REQUEST
+  ========================================================== */
+
+  if (requestLoading) {
+    return (
+      <main className="min-h-screen bg-midnight px-4 py-10 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl">
+
+          <div className="mb-6">
+            <BackButton />
+          </div>
+
+          <section
+            aria-live="polite"
+            className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-center shadow-2xl backdrop-blur-xl"
+          >
+            <Loader2
+              size={34}
+              className="mx-auto animate-spin text-cyan-400"
+              aria-hidden="true"
+            />
+
+            <p className="mt-4 font-semibold text-white">
+              Loading certificate request...
+            </p>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Request #{requestId}
+            </p>
+          </section>
+
+        </div>
+      </main>
+    );
+  }
+
+  /* ==========================================================
+     REQUEST LOAD ERROR
+  ========================================================== */
+
+  if (requestError || !request) {
+    return (
+      <main className="min-h-screen bg-midnight px-4 py-10 sm:px-6">
+        <div className="mx-auto w-full max-w-2xl">
+
+          <div className="mb-6">
+            <BackButton />
+          </div>
+
+          <section
+            aria-live="assertive"
+            className="rounded-3xl border border-red-400/20 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
+          >
+            <div className="mb-5 inline-flex rounded-2xl bg-red-400/10 p-3 text-red-300">
+              <AlertCircle
+                size={30}
+                aria-hidden="true"
+              />
+            </div>
+
+            <h1 className="text-2xl font-bold text-white">
+              Unable to Load Certificate Request
+            </h1>
+
+            <p className="mt-3 leading-6 text-slate-400">
+              {requestError ||
+                "The certificate request could not be loaded."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                navigate(
+                  "/admin/certificate-requests"
+                )
+              }
+              className="mt-6 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              Back to Certificate Requests
+            </button>
+          </section>
+
+        </div>
+      </main>
+    );
+  }
+
+  /* ==========================================================
+     UI
+  ========================================================== */
 
   return (
     <main className="min-h-screen bg-midnight px-4 py-10 sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
 
-        {/* =================================================
+        {/* ====================================================
             BACK BUTTON
-        ================================================= */}
+        ==================================================== */}
 
         <div className="mb-6">
           <BackButton />
         </div>
 
-        {/* =================================================
-            PAGE HEADER
-        ================================================= */}
+        {/* ====================================================
+            HEADER
+        ==================================================== */}
 
-        <div className="mb-8">
-          <div className="mb-4 inline-flex rounded-2xl bg-cyan-400/10 p-3 text-cyan-300">
+        <header className="mb-8">
+
+          <div
+            className="mb-4 inline-flex rounded-2xl bg-cyan-400/10 p-3 text-cyan-300"
+            aria-hidden="true"
+          >
             <Award size={30} />
           </div>
 
@@ -348,162 +818,193 @@ export default function AddCertificate() {
             Create Certificate
           </h1>
 
-          <p className="mt-2 text-slate-400">
-            Create and issue a certificate for a
-            registered employee.
+          <p className="mt-2 max-w-2xl text-slate-400">
+            Review the certificate request and create
+            the official employee certificate.
           </p>
-        </div>
 
-        {/* =================================================
-            SUCCESS MESSAGE
-        ================================================= */}
+        </header>
+
+        {/* ====================================================
+            REQUEST INFORMATION
+        ==================================================== */}
+
+        <section
+          aria-labelledby="request-information-title"
+          className="mb-6 rounded-2xl border border-cyan-400/10 bg-cyan-400/5 p-5"
+        >
+
+          <div className="flex items-start gap-3">
+
+            <FileCheck2
+              size={22}
+              className="mt-0.5 shrink-0 text-cyan-300"
+              aria-hidden="true"
+            />
+
+            <div className="min-w-0 flex-1">
+
+              <h2
+                id="request-information-title"
+                className="text-sm font-semibold text-cyan-200"
+              >
+                Certificate Request #{request.id}
+              </h2>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+
+                <div>
+                  <p className="text-xs text-slate-500">
+                    Employee
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {request.employee_name ||
+                      "Employee information unavailable"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">
+                    Employee Email
+                  </p>
+
+                  <p className="mt-1 break-all text-sm text-slate-300">
+                    {request.employee_email ||
+                      "Email unavailable"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">
+                    Requested Type
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {request.certificate_type ||
+                      "Not specified"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">
+                    Request Status
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold capitalize text-emerald-300">
+                    {request.status ||
+                      "pending"}
+                  </p>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* ====================================================
+            SECURITY INFORMATION
+        ==================================================== */}
+
+        <section
+          aria-labelledby="security-title"
+          className="mb-6 rounded-2xl border border-cyan-400/10 bg-cyan-400/5 p-5"
+        >
+
+          <div className="flex items-start gap-3">
+
+            <ShieldCheck
+              size={22}
+              className="mt-0.5 shrink-0 text-cyan-300"
+              aria-hidden="true"
+            />
+
+            <div>
+
+              <h2
+                id="security-title"
+                className="text-sm font-semibold text-cyan-200"
+              >
+                Secure certificate request
+              </h2>
+
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                Employee identity is resolved from the
+                verified certificate request on the server.
+                Employee ID, recipient name, certificate
+                number, and verification token cannot be
+                supplied by the frontend.
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* ====================================================
+            SUCCESS
+        ==================================================== */}
 
         {success && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300">
+          <section
+            aria-live="polite"
+            className="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300"
+          >
 
             <div className="flex items-start gap-3">
+
               <CheckCircle
                 size={22}
                 className="mt-0.5 shrink-0"
+                aria-hidden="true"
               />
 
-              <div className="min-w-0">
+              <div>
+
                 <p className="font-semibold">
                   {success}
                 </p>
 
-                <p className="mt-1 text-sm text-emerald-300/80">
-                  The certificate ID was generated
-                  automatically by the server.
-                </p>
+                {createdCertificate?.certificate_no && (
+                  <p className="mt-2 text-sm text-emerald-300/80">
+                    Certificate No:{" "}
+                    <strong className="text-white">
+                      {
+                        createdCertificate.certificate_no
+                      }
+                    </strong>
+                  </p>
+                )}
+
               </div>
+
             </div>
 
-            {/* =============================================
-                CREATED CERTIFICATE DETAILS
-            ============================================= */}
-
-            {createdCertificate && (
-              <div className="mt-5 rounded-xl border border-emerald-400/10 bg-black/10 p-4">
-
-                <div className="grid gap-4 sm:grid-cols-2">
-
-                  {/* CERTIFICATE NUMBER */}
-
-                  {createdCertificate
-                    .certificate_no && (
-                    <div>
-                      <p className="text-xs text-emerald-300/60">
-                        Certificate ID
-                      </p>
-
-                      <p className="mt-1 break-all text-sm font-bold text-white">
-                        {
-                          createdCertificate.certificate_no
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  {/* CERTIFICATE TYPE */}
-
-                  {createdCertificate
-                    .certificate_type && (
-                    <div>
-                      <p className="text-xs text-emerald-300/60">
-                        Certificate Type
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        {createdCertificate
-                          .certificate_type ===
-                        "INTR"
-                          ? "Internship"
-                          : "Certificate"}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* EMPLOYEE */}
-
-                  {createdCertificate
-                    .employee_name && (
-                    <div>
-                      <p className="text-xs text-emerald-300/60">
-                        Employee
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        {
-                          createdCertificate.employee_name
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  {/* EMPLOYEE EMAIL */}
-
-                  {createdCertificate
-                    .employee_email && (
-                    <div>
-                      <p className="text-xs text-emerald-300/60">
-                        Employee Gmail
-                      </p>
-
-                      <p className="mt-1 break-all text-sm font-semibold text-white">
-                        {
-                          createdCertificate.employee_email
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  {/* VERIFICATION TOKEN */}
-
-                  {createdCertificate
-                    .verification_token && (
-                    <div className="sm:col-span-2">
-                      <p className="text-xs text-emerald-300/60">
-                        Verification Token
-                      </p>
-
-                      <p className="mt-1 break-all font-mono text-xs text-white">
-                        {
-                          createdCertificate.verification_token
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/admin")
-              }
-              className="mt-4 text-sm underline transition hover:text-white"
-            >
-              Return to dashboard
-            </button>
-          </div>
+          </section>
         )}
 
-        {/* =================================================
-            ERROR MESSAGE
-        ================================================= */}
+        {/* ====================================================
+            ERROR
+        ==================================================== */}
 
         {error && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-red-300">
+          <section
+            aria-live="assertive"
+            className="mb-6 flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-red-300"
+          >
 
             <AlertCircle
               size={22}
               className="mt-0.5 shrink-0"
+              aria-hidden="true"
             />
 
             <div>
+
               <p className="font-semibold">
                 Certificate creation failed
               </p>
@@ -511,25 +1012,70 @@ export default function AddCertificate() {
               <p className="mt-1 text-sm text-red-300/80">
                 {error}
               </p>
+
             </div>
-          </div>
+
+          </section>
         )}
 
-        {/* =================================================
+        {/* ====================================================
             FORM
-        ================================================= */}
+        ==================================================== */}
 
         <form
           onSubmit={handleSubmit}
+          noValidate
           className="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
         >
+
           <div className="grid gap-6 md:grid-cols-2">
 
-            {/* =================================================
+            {/* ==================================================
+                REQUEST ID
+            ================================================== */}
+
+            <div className="md:col-span-2">
+
+              <label
+                htmlFor="requestId"
+                className="mb-2 block text-sm font-medium text-slate-300"
+              >
+                Certificate Request
+              </label>
+
+              <div className="flex items-center gap-3 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-4">
+
+                <FileCheck2
+                  size={19}
+                  className="shrink-0 text-cyan-400"
+                  aria-hidden="true"
+                />
+
+                <input
+                  id="requestId"
+                  type="text"
+                  value={`Request #${requestId}`}
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full cursor-default bg-transparent py-3.5 text-sm font-semibold text-cyan-200 outline-none"
+                />
+
+              </div>
+
+              <p className="mt-2 text-xs text-slate-500">
+                This request identifier comes from the
+                certificate request workflow and cannot
+                be changed here.
+              </p>
+
+            </div>
+
+            {/* ==================================================
                 CERTIFICATE TYPE
-            ================================================= */}
+            ================================================== */}
 
             <div>
+
               <label
                 htmlFor="certificateType"
                 className="mb-2 block text-sm font-medium text-slate-300"
@@ -542,6 +1088,7 @@ export default function AddCertificate() {
                 <FileCheck2
                   size={19}
                   className="shrink-0 text-slate-500"
+                  aria-hidden="true"
                 />
 
                 <select
@@ -555,135 +1102,112 @@ export default function AddCertificate() {
                   disabled={loading}
                   className="w-full bg-transparent py-3.5 text-sm text-white outline-none"
                 >
-                  <option
-                    value="CERT"
-                    className="bg-slate-900"
-                  >
-                    Certificate
-                  </option>
 
-                  <option
-                    value="INTR"
-                    className="bg-slate-900"
-                  >
-                    Internship
-                  </option>
+                  {CERTIFICATE_TYPES.map(
+                    (type) => (
+                      <option
+                        key={type.value}
+                        value={type.value}
+                        className="bg-slate-900"
+                      >
+                        {type.label}
+                      </option>
+                    )
+                  )}
+
                 </select>
+
               </div>
 
-              <p className="mt-2 text-xs text-slate-500">
-                The certificate ID will be generated
-                automatically.
-              </p>
             </div>
 
-            {/* =================================================
-                GENERATED ID PREVIEW
-            ================================================= */}
+            {/* ==================================================
+                CERTIFICATE NUMBER
+            ================================================== */}
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
-                Certificate ID
-              </label>
+
+              <span className="mb-2 block text-sm font-medium text-slate-300">
+                Certificate Number
+              </span>
 
               <div className="flex items-center gap-3 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-4">
 
                 <FileCheck2
                   size={19}
                   className="shrink-0 text-cyan-400"
+                  aria-hidden="true"
                 />
 
                 <div className="py-3.5">
+
                   <p className="text-sm font-semibold text-cyan-200">
-                    Auto Generated
+                    Generated by server
                   </p>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    EITS-
-                    {form.certificateType}-
-                    YYYY-1001+
+                    Cannot be manually changed
                   </p>
+
                 </div>
+
               </div>
 
-              <p className="mt-2 text-xs text-slate-500">
-                This value cannot be manually changed.
-              </p>
             </div>
 
-            {/* =================================================
-                EMPLOYEE GMAIL
-            ================================================= */}
+            {/* ==================================================
+                EMPLOYEE
+            ================================================== */}
 
             <div className="md:col-span-2">
-              <label
-                htmlFor="employeeEmail"
-                className="mb-2 block text-sm font-medium text-slate-300"
-              >
-                Employee Gmail
-              </label>
 
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/80 px-4 transition focus-within:border-cyan-400 focus-within:ring-1 focus-within:ring-cyan-400/20">
+              <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
 
-                <Mail
-                  size={19}
-                  className="shrink-0 text-slate-500"
-                />
+                <div className="flex items-start gap-3">
 
-                <input
-                  id="employeeEmail"
-                  name="employeeEmail"
-                  type="email"
-                  value={
-                    form.employeeEmail
-                  }
-                  onChange={handleChange}
-                  placeholder="employee@gmail.com"
-                  required
-                  disabled={loading}
-                  autoComplete="email"
-                  className="w-full bg-transparent py-3.5 text-sm text-white outline-none placeholder:text-slate-600"
-                />
-              </div>
+                  <UserRound
+                    size={20}
+                    className="mt-0.5 shrink-0 text-cyan-300"
+                    aria-hidden="true"
+                  />
 
-              <p className="mt-2 text-xs text-slate-500">
-                This Gmail must already exist in
-                the employee database.
-              </p>
-            </div>
+                  <div className="min-w-0">
 
-            {/* =================================================
-                DATABASE LINK INFORMATION
-            ================================================= */}
+                    <p className="text-sm font-medium text-cyan-200">
+                      Employee
+                    </p>
 
-            <div className="md:col-span-2">
-              <div className="flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
+                    <p className="mt-1 text-sm font-semibold text-white">
+                      {request.employee_name ||
+                        "Employee name unavailable"}
+                    </p>
 
-                <UserRound
-                  size={20}
-                  className="mt-0.5 shrink-0 text-cyan-300"
-                />
+                    {request.employee_email && (
+                      <p className="mt-1 break-all text-xs text-slate-400">
+                        {request.employee_email}
+                      </p>
+                    )}
 
-                <div>
-                  <p className="text-sm font-medium text-cyan-200">
-                    Employee verification
-                  </p>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      Employee identity is read from the
+                      verified request and cannot be changed
+                      from this form.
+                    </p>
 
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    The server will match this Gmail
-                    against registered employee
-                    accounts before creating the
-                    certificate.
-                  </p>
+                  </div>
+
                 </div>
+
               </div>
+
             </div>
 
-            {/* =================================================
-                COURSE NAME
-            ================================================= */}
+            {/* ==================================================
+                COURSE
+            ================================================== */}
 
             <div>
+
               <label
                 htmlFor="courseName"
                 className="mb-2 block text-sm font-medium text-slate-300"
@@ -696,6 +1220,7 @@ export default function AddCertificate() {
                 <Award
                   size={19}
                   className="shrink-0 text-slate-500"
+                  aria-hidden="true"
                 />
 
                 <input
@@ -707,18 +1232,23 @@ export default function AddCertificate() {
                   }
                   onChange={handleChange}
                   placeholder="Web Development"
+                  maxLength={200}
                   required
                   disabled={loading}
+                  autoComplete="off"
                   className="w-full bg-transparent py-3.5 text-sm text-white outline-none placeholder:text-slate-600"
                 />
+
               </div>
+
             </div>
 
-            {/* =================================================
-                ISSUER NAME
-            ================================================= */}
+            {/* ==================================================
+                ISSUER
+            ================================================== */}
 
             <div>
+
               <label
                 htmlFor="issuerName"
                 className="mb-2 block text-sm font-medium text-slate-300"
@@ -731,6 +1261,7 @@ export default function AddCertificate() {
                 <Building2
                   size={19}
                   className="shrink-0 text-slate-500"
+                  aria-hidden="true"
                 />
 
                 <input
@@ -741,18 +1272,23 @@ export default function AddCertificate() {
                     form.issuerName
                   }
                   onChange={handleChange}
+                  maxLength={200}
                   required
                   disabled={loading}
+                  autoComplete="organization"
                   className="w-full bg-transparent py-3.5 text-sm text-white outline-none"
                 />
+
               </div>
+
             </div>
 
-            {/* =================================================
+            {/* ==================================================
                 ISSUE DATE
-            ================================================= */}
+            ================================================== */}
 
             <div className="md:col-span-2">
+
               <label
                 htmlFor="issueDate"
                 className="mb-2 block text-sm font-medium text-slate-300"
@@ -765,6 +1301,7 @@ export default function AddCertificate() {
                 <CalendarDays
                   size={19}
                   className="shrink-0 text-slate-500"
+                  aria-hidden="true"
                 />
 
                 <input
@@ -779,58 +1316,101 @@ export default function AddCertificate() {
                   disabled={loading}
                   className="w-full bg-transparent py-3.5 text-sm text-white outline-none"
                 />
+
               </div>
+
             </div>
+
           </div>
 
-          {/* =================================================
+          {/* ====================================================
               SECURITY NOTICE
-          ================================================= */}
+          ==================================================== */}
 
           <div className="mt-6 rounded-xl border border-white/10 bg-slate-950/50 p-4">
 
-            <p className="text-xs leading-5 text-slate-400">
-              <span className="font-semibold text-slate-300">
-                Security:
-              </span>{" "}
-              Certificate ID, employee ID and
-              recipient name are never accepted
-              from the frontend. The backend
-              generates the certificate ID and
-              obtains employee information directly
-              from PostgreSQL.
-            </p>
+            <div className="flex items-start gap-3">
+
+              <ShieldCheck
+                size={18}
+                className="mt-0.5 shrink-0 text-emerald-300"
+                aria-hidden="true"
+              />
+
+              <p className="text-xs leading-5 text-slate-400">
+
+                <span className="font-semibold text-slate-300">
+                  Security:
+                </span>{" "}
+
+                The frontend does not provide employee ID,
+                recipient name, certificate ID, certificate
+                number, or verification token. The backend
+                obtains employee information from the verified
+                certificate request and generates certificate
+                identifiers securely.
+
+              </p>
+
+            </div>
+
           </div>
 
-          {/* =================================================
+          {/* ====================================================
               BUTTONS
-          ================================================= */}
+          ==================================================== */}
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
 
             <button
               type="button"
               onClick={() =>
-                navigate("/admin")
+                navigate(
+                  "/admin/certificate-requests"
+                )
               }
               disabled={loading}
-              className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 font-medium text-slate-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-1/3"
+              className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 font-medium text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50 sm:w-1/3"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-cyan-400 py-3.5 font-semibold text-slate-950 shadow-lg shadow-cyan-400/10 transition hover:bg-cyan-300 hover:shadow-cyan-400/20 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 sm:w-2/3"
+              disabled={
+                loading ||
+                requestLoading
+              }
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-3.5 font-semibold text-slate-950 shadow-lg shadow-cyan-400/10 transition hover:bg-cyan-300 hover:shadow-cyan-400/20 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 sm:w-2/3"
             >
-              {loading
-                ? "Creating Certificate..."
-                : "Create Certificate"}
+
+              {loading ? (
+                <>
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+
+                  Creating Certificate...
+                </>
+              ) : (
+                <>
+                  <CheckCircle
+                    size={18}
+                    aria-hidden="true"
+                  />
+
+                  Create Certificate
+                </>
+              )}
+
             </button>
 
           </div>
+
         </form>
+
       </div>
     </main>
   );
