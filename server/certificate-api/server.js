@@ -1,5 +1,5 @@
 // ============================================================
-// CERTIFICATE MANAGEMENT SYSTEM
+// ESPARKS IT SOLUTIONS CERTIFICATE MANAGEMENT SYSTEM
 // Backend API Server
 // Express + PostgreSQL + Socket.IO
 // ============================================================
@@ -68,8 +68,7 @@ const PORT = Number(process.env.PORT) || 5000;
 
 const CLIENT_URL =
   process.env.CLIENT_URL ||
-  "http://192.168.1.5:5174";
-
+  "http://localhost:5174";
 // ============================================================
 // 7. CORS CONFIGURATION
 // ============================================================
