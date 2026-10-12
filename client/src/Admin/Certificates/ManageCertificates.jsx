@@ -241,9 +241,7 @@ export default function ManageCertificates() {
             type="button"
             className="add-certificate-btn"
             onClick={() =>
-              navigate(
-                "/admin/certificates/new"
-              )
+           navigate("/admin/certificates/create")
             }
           >
             <Plus size={18} />
@@ -351,9 +349,7 @@ export default function ManageCertificates() {
                 type="button"
                 className="empty-create-btn"
                 onClick={() =>
-                  navigate(
-                    "/admin/certificates/new"
-                  )
+                navigate("/admin/certificates/create")
                 }
               >
                 <Plus size={18} />

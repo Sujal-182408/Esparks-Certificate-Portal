@@ -246,8 +246,8 @@
   top: 50%;
   left: 50%;
 
-  width: 430px;
-  height: 430px;
+  width: 40vw;
+  height: 40vh;
 
   max-width: none;
   max-height: none;
@@ -258,7 +258,7 @@
     translate(-50%, -50%)
     rotate(-30deg);
 
-  opacity: 0.055;
+  opacity: 0.065;
 
   pointer-events: none;
   user-select: none;
@@ -419,8 +419,8 @@
   top: 0;
   left: 0;
 
-  width: 165px;
-  height: 70px;
+  width: 40vw;
+  height: 10vh;
 
   display: flex;
 
@@ -446,10 +446,10 @@
   position: absolute;
 
   left: 50%;
-  top: 100px;
+  top: 60px;
 
-  width: 55px;
-  height: 55px;
+  width: 20vw;
+  height: 20vh;
 
   display: flex;
 
@@ -467,7 +467,7 @@
 
   flex: 0 0 auto;
 
-  color: #b7894e;
+  color: #106ec0;
 
   stroke-width: 2;
 }
@@ -511,7 +511,7 @@
 .certificate-title-section h2 {
   margin: 14px 0 0;
 
-  color: #ae7d47;
+  color: #106ec0;
 
   font-family:
     Georgia,
@@ -541,7 +541,7 @@
 
   margin: 14px auto 0;
 
-  background: #d8c7ae;
+  background: #106ec0;
 }
 
 .certificate-title-line::before,
@@ -555,7 +555,7 @@
   width: 6px;
   height: 6px;
 
-  background: #b78a51;
+  background: #106ec0;
 
   transform:
     translateY(-50%)
@@ -619,19 +619,22 @@
 .certificate-recipient {
   margin: 30px 0 0;
 
-  color: #c69770;
+  color: #106ec0;
+
 
   font-family:
-    "Brush Script MT",
-    "Segoe Script",
-    "Lucida Handwriting",
-    cursive;
+    /* "Brush Script MT", */
+    /* "Segoe Script", */
+      /* "Lucida Handwriting", */
+      'Times New Roman',
+        cursive
+    ;
 
   font-size: 69px;
 
-  font-weight: 400;
+  font-weight: 600;
 
-  letter-spacing: 0.3rem;
+  letter-spacing: 0.1rem;
 
   line-height: 1;
 
@@ -680,7 +683,7 @@
 }
 
 .certificate-description-section strong {
-  color: #1765a0;
+  color: #c96363;
 
   font-weight: 700;
 }
@@ -924,9 +927,9 @@
 
   color: #777777;
 
-  font-size: 7px;
+  font-size: 8px;
 
-  font-weight: 500;
+  font-weight: 600;
 
   letter-spacing: 0.25px;
 }

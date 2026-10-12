@@ -12,11 +12,11 @@ import {
 
 import { apiRequest } from "../../services/api";
 
-import companyLogo from "../../assets/logo.png";
-import sign from "../../assets/sign.png";
-import nipLogo from "../../assets/niplogo.png";
-import msmeLogo from "../../assets/msmelogo.png";
-import isoLogo from "../../assets/iso-logo.png";
+import companyLogo from "../../assets/logo.webp";
+import sign from "../../assets/sign.webp";
+import nipLogo from "../../assets/niplogo.webp";
+import msmeLogo from "../../assets/msmelogo.webp";
+import isoLogo from "../../assets/iso-logo.webp";
 
 import "../../pages/CertificateView.css";
 

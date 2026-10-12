@@ -1,15 +1,6 @@
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { QRCodeSVG } from "qrcode.react";
 
@@ -27,11 +18,12 @@ import jsPDF from "jspdf";
 
 import { apiRequest } from "../services/api";
 
-import companyLogo from "../assets/logo.png";
-import sign from "../assets/sign.png";
-import nipLogo from "../assets/niplogo.png";
-import msmeLogo from "../assets/msmelogo.png";
-import isoLogo from "../assets/iso-logo.png";
+
+import companyLogo from "../assets/logo.webp";
+import sign from "../assets/sign.webp";
+import nipLogo from "../assets/niplogo.webp";
+import msmeLogo from "../assets/msmelogo.webp";
+import isoLogo from "../assets/iso-logo.webp";
 
 import "./CertificateView.css";
 
@@ -50,49 +42,25 @@ function normalizeCertificate(raw = {}) {
       raw.employee_name ||
       "",
 
-    courseName:
-      raw.courseName ||
-      raw.course_name ||
-      "",
+    courseName: raw.courseName || raw.course_name || "",
 
-    certificateNo:
-      raw.certificateNo ||
-      raw.certificate_no ||
-      "",
+    certificateNo: raw.certificateNo || raw.certificate_no || "",
 
     certificateType:
-      raw.certificateType ||
-      raw.certificate_type ||
-      "INTERNSHIP",
+      raw.certificateType || raw.certificate_type || "INTERNSHIP",
+    durationMonths: raw.durationMonths ?? raw.duration_months ?? null,
 
-    issueDate:
-      raw.issueDate ||
-      raw.issue_date ||
-      "",
+    issueDate: raw.issueDate || raw.issue_date || "",
 
-    issuerName:
-      raw.issuerName ||
-      raw.issuer_name ||
-      "",
+    issuerName: raw.issuerName || raw.issuer_name || "",
 
-    verificationToken:
-      raw.verificationToken ||
-      raw.verification_token ||
-      "",
+    verificationToken: raw.verificationToken || raw.verification_token || "",
 
-    status:
-      raw.status ||
-      "",
+    status: raw.status || "",
 
-    createdAt:
-      raw.createdAt ||
-      raw.created_at ||
-      "",
+    createdAt: raw.createdAt || raw.created_at || "",
 
-    revokedAt:
-      raw.revokedAt ||
-      raw.revoked_at ||
-      "",
+    revokedAt: raw.revokedAt || raw.revoked_at || "",
   };
 }
 
@@ -105,8 +73,7 @@ function toTitleCase(value = "") {
     .toLowerCase()
     .replace(
       /(^|[\s'-])([a-z])/g,
-      (_, separator, letter) =>
-        `${separator}${letter.toUpperCase()}`
+      (_, separator, letter) => `${separator}${letter.toUpperCase()}`,
     );
 }
 
@@ -143,28 +110,21 @@ const CertificateView = () => {
 
   const certificateRef = useRef(null);
 
-  const [certificate, setCertificate] =
-    useState(null);
+  const [certificate, setCertificate] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [isDownloading, setIsDownloading] =
-    useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   /* ==========================================================
      ADMIN / EMPLOYEE
   ========================================================== */
 
-  const isAdmin =
-    location.pathname.startsWith("/admin");
+  const isAdmin = location.pathname.startsWith("/admin");
 
-  const dashboardPath = isAdmin
-    ? "/admin"
-    : "/dashboard";
+  const dashboardPath = isAdmin ? "/admin" : "/dashboard";
 
   /* ==========================================================
      VERIFICATION URL
@@ -176,56 +136,37 @@ const CertificateView = () => {
     }
 
     return `${window.location.origin}/verify?token=${encodeURIComponent(
-      certificate.verificationToken
+      certificate.verificationToken,
     )}`;
-  }, [
-    certificate?.verificationToken,
-  ]);
+  }, [certificate?.verificationToken]);
 
   /* ==========================================================
      WAIT FOR IMAGES
   ========================================================== */
 
   const waitForImages = async (element) => {
-    const images = Array.from(
-      element.querySelectorAll("img")
-    );
+    const images = Array.from(element.querySelectorAll("img"));
 
     await Promise.all(
       images.map((img) => {
-        if (
-          img.complete &&
-          img.naturalWidth > 0
-        ) {
+        if (img.complete && img.naturalWidth > 0) {
           return Promise.resolve();
         }
 
         return new Promise((resolve) => {
           const handleDone = () => {
-            img.removeEventListener(
-              "load",
-              handleDone
-            );
+            img.removeEventListener("load", handleDone);
 
-            img.removeEventListener(
-              "error",
-              handleDone
-            );
+            img.removeEventListener("error", handleDone);
 
             resolve();
           };
 
-          img.addEventListener(
-            "load",
-            handleDone
-          );
+          img.addEventListener("load", handleDone);
 
-          img.addEventListener(
-            "error",
-            handleDone
-          );
+          img.addEventListener("error", handleDone);
         });
-      })
+      }),
     );
   };
 
@@ -249,149 +190,225 @@ const CertificateView = () => {
   ========================================================== */
 
   const handleDownloadPDF = async () => {
-    if (
-      !certificateRef.current ||
-      isDownloading
-    ) {
+    if (!certificateRef.current || isDownloading) {
       return;
     }
 
     try {
       setIsDownloading(true);
 
-      const element =
-        certificateRef.current;
+      const element = certificateRef.current;
 
       /* --------------------------------------------------------
-         WAIT FOR FONTS
-      -------------------------------------------------------- */
+       WAIT FOR FONTS
+    -------------------------------------------------------- */
 
       if (document.fonts?.ready) {
         await document.fonts.ready;
       }
 
       /* --------------------------------------------------------
-         WAIT FOR IMAGES
-      -------------------------------------------------------- */
+       WAIT FOR IMAGES
+    -------------------------------------------------------- */
 
       await waitForImages(element);
 
       /* --------------------------------------------------------
-         CAPTURE MASTER CERTIFICATE
-      -------------------------------------------------------- */
+       CAPTURE CERTIFICATE
+       FORCE MASTER SIZE DURING PDF GENERATION
+    -------------------------------------------------------- */
 
-      const canvas =
-        await html2canvas(element, {
-          width: 1380,
-          height: 976,
+      const canvas = await html2canvas(element, {
+        width: 1380,
+        height: 976,
 
-          windowWidth: 1380,
-          windowHeight: 976,
+        windowWidth: 1380,
+        windowHeight: 976,
 
-          x: 0,
-          y: 0,
+        x: 0,
+        y: 0,
 
-          scrollX: 0,
-          scrollY: 0,
+        scrollX: 0,
+        scrollY: 0,
 
-          scale: 3,
+        scale: 3,
 
-          backgroundColor:
-            "#ffffff",
+        backgroundColor: "#ffffff",
 
-          useCORS: true,
+        useCORS: true,
+        allowTaint: false,
 
-          allowTaint: false,
+        logging: false,
 
-          logging: false,
+        foreignObjectRendering: false,
 
-          foreignObjectRendering:
-            false,
+        imageTimeout: 15000,
 
-          imageTimeout: 15000,
-        });
+        /*
+         * IMPORTANT
+         * Keep the certificate at its original
+         * 1380 × 976 layout while html2canvas
+         * creates the PDF image.
+         */
+        onclone: (clonedDocument) => {
+          const clonedCertificate = clonedDocument.querySelector(
+            ".certificate-document",
+          );
+
+          if (!clonedCertificate) {
+            return;
+          }
+
+          /* ========================================================
+     FORCE MASTER CERTIFICATE SIZE
+  ======================================================== */
+
+          clonedCertificate.style.width = "1380px";
+          clonedCertificate.style.height = "976px";
+
+          clonedCertificate.style.minWidth = "1380px";
+          clonedCertificate.style.minHeight = "976px";
+
+          clonedCertificate.style.maxWidth = "1380px";
+          clonedCertificate.style.maxHeight = "976px";
+
+          clonedCertificate.style.margin = "0";
+          clonedCertificate.style.padding = "0";
+
+          clonedCertificate.style.transform = "none";
+          clonedCertificate.style.boxSizing = "border-box";
+
+          /* ========================================================
+     KEEP EXACT CERTIFICATE LAYOUT
+     DO NOT REPOSITION CHILD ELEMENTS
+  ======================================================== */
+
+          const titleSection = clonedCertificate.querySelector(
+            ".certificate-title-section",
+          );
+
+          if (titleSection) {
+            titleSection.style.position = "absolute";
+            titleSection.style.top = "235px";
+            titleSection.style.left = "0";
+            titleSection.style.right = "0";
+            titleSection.style.margin = "0";
+            titleSection.style.padding = "0";
+          }
+
+          /* ========================================================
+     TITLE LINE
+  ======================================================== */
+
+          const titleLine = clonedCertificate.querySelector(
+            ".certificate-title-line",
+          );
+
+          if (titleLine) {
+            titleLine.style.position = "relative";
+            titleLine.style.top = "25px";
+            titleLine.style.margin = "14px auto 0";
+          }
+
+          /* ========================================================
+     RECIPIENT SECTION
+  ======================================================== */
+
+          const recipientSection = clonedCertificate.querySelector(
+            ".certificate-recipient-section",
+          );
+
+          if (recipientSection) {
+            recipientSection.style.position = "absolute";
+
+            recipientSection.style.top = "350px";
+
+            recipientSection.style.left = "50%";
+
+            recipientSection.style.width = "72%";
+
+            recipientSection.style.margin = "0";
+
+            recipientSection.style.padding = "0";
+
+            recipientSection.style.transform = "translateX(-50%)";
+          }
+
+          /* ========================================================
+     AWARDED TEXT
+  ======================================================== */
+
+          const awardedText = clonedCertificate.querySelector(
+            ".certificate-awarded-text",
+          );
+
+          if (awardedText) {
+            awardedText.style.margin = "0";
+            awardedText.style.padding = "0";
+
+            awardedText.style.lineHeight = "1";
+          }
+
+          /* ========================================================
+     RECIPIENT NAME
+  ======================================================== */
+
+          const recipient = clonedCertificate.querySelector(
+            ".certificate-recipient",
+          );
+
+          if (recipient) {
+            recipient.style.margin = "30px 0 0";
+
+            recipient.style.padding = "0";
+
+            recipient.style.lineHeight = "1";
+          }
+        },
+      });
 
       /* --------------------------------------------------------
-         PNG
-      -------------------------------------------------------- */
+       PNG
+    -------------------------------------------------------- */
 
-      const imageData =
-        canvas.toDataURL(
-          "image/png",
-          1.0
-        );
+      const imageData = canvas.toDataURL("image/png", 1.0);
 
       /* --------------------------------------------------------
-         CREATE A4 PDF
-      -------------------------------------------------------- */
+       CREATE A4 LANDSCAPE PDF
+    -------------------------------------------------------- */
 
-      const pdf =
-        new jsPDF({
-          orientation:
-            "landscape",
-
-          unit: "mm",
-
-          format: "a4",
-
-          compress: true,
-        });
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
 
       /* --------------------------------------------------------
-         FIT COMPLETE CERTIFICATE TO A4
+       EXACT MASTER → A4
 
-         1380 × 976
+       1380 × 976
+       ↓
+       297 × 210 mm
+    -------------------------------------------------------- */
 
-         becomes
-
-         297 × 210 mm
-      -------------------------------------------------------- */
-
-      pdf.addImage(
-        imageData,
-        "PNG",
-        0,
-        0,
-        297,
-        210,
-        undefined,
-        "FAST"
-      );
+      pdf.addImage(imageData, "PNG", 0, 0, 297, 210, undefined, "FAST");
 
       /* --------------------------------------------------------
-         FILE NAME
-      -------------------------------------------------------- */
+       FILE NAME
+    -------------------------------------------------------- */
 
-      const certificateNumber =
-        certificate?.certificateNo ||
-        "certificate";
+      const certificateNumber = certificate?.certificateNo || "certificate";
 
-      const safeName =
-        String(
-          certificateNumber
-        )
-          .replace(
-            /[<>:"/\\|?*]+/g,
-            "-"
-          )
-          .trim();
+      const safeName = String(certificateNumber)
+        .replace(/[<>:"/\\|?*]+/g, "-")
+        .trim();
 
-      pdf.save(
-        `${
-          safeName ||
-          "certificate"
-        }.pdf`
-      );
+      pdf.save(`${safeName || "certificate"}.pdf`);
     } catch (error) {
-      console.error(
-        "PDF generation failed:",
-        error
-      );
+      console.error("PDF generation failed:", error);
 
-      alert(
-        error?.message ||
-          "Unable to generate certificate PDF."
-      );
+      alert(error?.message || "Unable to generate certificate PDF.");
     } finally {
       setIsDownloading(false);
     }
@@ -410,67 +427,39 @@ const CertificateView = () => {
         setError("");
 
         if (!token) {
-          throw new Error(
-            "Certificate verification token is missing."
-          );
+          throw new Error("Certificate verification token is missing.");
         }
 
-        const data =
-          await apiRequest(
-            `/verify/${encodeURIComponent(
-              token
-            )}`
-          );
+        const data = await apiRequest(`/verify/${encodeURIComponent(token)}`);
 
         if (!mounted) {
           return;
         }
 
-        if (
-          !data?.valid ||
-          !data?.certificate
-        ) {
+        if (!data?.valid || !data?.certificate) {
           throw new Error(
-            data?.message ||
-              "This certificate could not be loaded."
+            data?.message || "This certificate could not be loaded.",
           );
         }
 
-        const normalizedCertificate =
-          normalizeCertificate(
-            data.certificate
-          );
+        const normalizedCertificate = normalizeCertificate(data.certificate);
 
-        const certificateStatus =
-          String(
-            normalizedCertificate.status ||
-              ""
-          ).toLowerCase();
+        const certificateStatus = String(
+          normalizedCertificate.status || "",
+        ).toLowerCase();
 
-        if (
-          certificateStatus &&
-          certificateStatus !==
-            "issued"
-        ) {
+        if (certificateStatus && certificateStatus !== "issued") {
           throw new Error(
-            "This certificate has been revoked and is no longer available."
+            "This certificate has been revoked and is no longer available.",
           );
         }
 
-        setCertificate(
-          normalizedCertificate
-        );
+        setCertificate(normalizedCertificate);
       } catch (err) {
-        console.error(
-          "Certificate loading error:",
-          err
-        );
+        console.error("Certificate loading error:", err);
 
         if (mounted) {
-          setError(
-            err?.message ||
-              "Unable to load this certificate."
-          );
+          setError(err?.message || "Unable to load this certificate.");
         }
       } finally {
         if (mounted) {
@@ -494,24 +483,14 @@ const CertificateView = () => {
     return (
       <div className="certificate-state-page">
         <div className="certificate-state-card">
+          <Loader2 size={42} className="certificate-state-icon spin" />
 
-          <Loader2
-            size={42}
-            className="certificate-state-icon spin"
-          />
-
-          <h2>
-            Loading Certificate
-          </h2>
+          <h2>Loading Certificate</h2>
 
           <p>
-            Please wait while we
-            securely load your
-            certificate from the
-            official certificate
-            system.
+            Please wait while we securely load your certificate from the
+            official certificate system.
           </p>
-
         </div>
       </div>
     );
@@ -521,43 +500,27 @@ const CertificateView = () => {
      ERROR
   ========================================================== */
 
-  if (
-    error ||
-    !certificate
-  ) {
+  if (error || !certificate) {
     return (
       <div className="certificate-state-page">
-
         <div className="certificate-state-card certificate-error-card">
-
           <AlertCircle
             size={46}
             className="certificate-state-icon error-icon"
           />
 
-          <h2>
-            Certificate Access Failed
-          </h2>
+          <h2>Certificate Access Failed</h2>
 
-          <p>
-            {error ||
-              "The requested certificate could not be found."}
-          </p>
+          <p>{error || "The requested certificate could not be found."}</p>
 
           <button
             type="button"
             className="certificate-back-button"
-            onClick={() =>
-              navigate(
-                dashboardPath
-              )
-            }
+            onClick={() => navigate(dashboardPath)}
           >
             <ArrowLeft size={18} />
-
             Back to Dashboard
           </button>
-
         </div>
       </div>
     );
@@ -567,37 +530,23 @@ const CertificateView = () => {
      CERTIFICATE DATA
   ========================================================== */
 
-  const recipientName =
-    certificate.recipientName ||
-    "Certificate Recipient";
+  const recipientName = certificate.recipientName || "Certificate Recipient";
 
-  const courseName =
-    certificate.courseName ||
-    "Completed Program";
+  const courseName = certificate.courseName || "Completed Program";
 
-  const certificateNo =
-    certificate.certificateNo ||
-    "N/A";
+  const certificateNo = certificate.certificateNo || "N/A";
 
-  const certificateType =
-    certificate.certificateType ||
-    "INTERNSHIP";
+  const certificateType = certificate.certificateType || "INTERNSHIP";
 
-  const issuerName =
-    certificate.issuerName ||
-    "eSparks IT Solutions";
+  const durationMonths = certificate.durationMonths;
 
-  const issueDate =
-    formatCertificateDate(
-      certificate.issueDate
-    ) || "N/A";
+  const issuerName = certificate.issuerName || "eSparks IT Solutions";
 
-  const status =
-    certificate.status?.toLowerCase() ||
-    "issued";
+  const issueDate = formatCertificateDate(certificate.issueDate) || "N/A";
 
-  const isIssued =
-    status === "issued";
+  const status = certificate.status?.toLowerCase() || "issued";
+
+  const isIssued = status === "issued";
 
   /* ==========================================================
      RENDER
@@ -605,68 +554,45 @@ const CertificateView = () => {
 
   return (
     <div className="certificate-page">
-
       {/* =====================================================
           ACTION BAR
       ===================================================== */}
 
       <div className="certificate-actions no-print">
-
         <button
           type="button"
           className="certificate-dashboard-button"
-          onClick={() =>
-            navigate(
-              dashboardPath
-            )
-          }
+          onClick={() => navigate(dashboardPath)}
         >
           <ArrowLeft size={17} />
-
           Dashboard
         </button>
 
         <div className="certificate-admin-actions">
-
           <button
             type="button"
             className="certificate-dashboard-button"
-            onClick={
-              handleDownloadPDF
-            }
-            disabled={
-              isDownloading
-            }
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
           >
             <Download size={16} />
 
-            {isDownloading
-              ? "Generating PDF..."
-              : "Download PDF"}
+            {isDownloading ? "Generating PDF..." : "Download PDF"}
           </button>
 
           <div className="certificate-verification-status">
-
             {isIssued ? (
               <>
-                <CheckCircle2
-                  size={17}
-                />
-
+                <CheckCircle2 size={17} />
                 Certificate Verified
               </>
             ) : (
               <>
-                <AlertCircle
-                  size={17}
-                />
-
+                <AlertCircle size={17} />
                 Certificate Revoked
               </>
             )}
-
           </div>
-
         </div>
       </div>
 
@@ -675,16 +601,12 @@ const CertificateView = () => {
       ===================================================== */}
 
       <div className="certificate-wrapper">
-
         <article
           ref={certificateRef}
           className={`certificate-document ${
-            !isIssued
-              ? "certificate-document-revoked"
-              : ""
+            !isIssued ? "certificate-document-revoked" : ""
           }`}
         >
-
           {/* =================================================
               WATERMARK
           ================================================= */}
@@ -701,9 +623,7 @@ const CertificateView = () => {
           ================================================= */}
 
           <div className="certificate-frame">
-
             <div className="certificate-frame-inner">
-
               <span className="frame-corner frame-tl" />
 
               <span className="frame-corner frame-tr" />
@@ -711,9 +631,7 @@ const CertificateView = () => {
               <span className="frame-corner frame-bl" />
 
               <span className="frame-corner frame-br" />
-
             </div>
-
           </div>
 
           {/* =================================================
@@ -721,14 +639,12 @@ const CertificateView = () => {
           ================================================= */}
 
           <div className="certificate-top-id">
-
             <span>
               CERTIFICATE-ID:
               <br />
             </span>
 
             {certificateNo}
-
           </div>
 
           {/* =================================================
@@ -736,24 +652,13 @@ const CertificateView = () => {
           ================================================= */}
 
           <header className="certificate-header">
-
             <div className="certificate-logo-left">
-
-              <img
-                src={companyLogo}
-                alt="eSparks IT Solutions"
-              />
-
+              <img src={companyLogo} alt="eSparks IT Solutions" />
             </div>
 
             <div className="certificate-top-icon">
-
-              <GraduationCap
-                className="certificate-graduation-icon"
-              />
-
+              <GraduationCap className="certificate-graduation-icon" />
             </div>
-
           </header>
 
           {/* =================================================
@@ -761,17 +666,11 @@ const CertificateView = () => {
           ================================================= */}
 
           <section className="certificate-title-section">
+            <h1>CERTIFICATE</h1>
 
-            <h1>
-              CERTIFICATE
-            </h1>
-
-            <h2>
-              OF INTERNSHIP PROGRAM
-            </h2>
+            <h2>OF INTERNSHIP PROGRAM</h2>
 
             <div className="certificate-title-line" />
-
           </section>
 
           {/* =================================================
@@ -779,17 +678,13 @@ const CertificateView = () => {
           ================================================= */}
 
           <section className="certificate-recipient-section">
-
             <p className="certificate-awarded-text">
               THIS CERTIFICATE IS AWARDED TO
             </p>
 
             <h3 className="certificate-recipient">
-              {toTitleCase(
-                recipientName
-              )}
+              {toTitleCase(recipientName)}
             </h3>
-
           </section>
 
           {/* =================================================
@@ -797,39 +692,28 @@ const CertificateView = () => {
           ================================================= */}
 
           <section className="certificate-description-section">
-
-            <p>
-              In recognition of your
-              outstanding performance
-              and dedication during your
-              internship in{" "}
-
-              <strong>
-                {courseName}
-              </strong>
-
-              {" "}at{" "}
-
-              <strong>
-                {issuerName}
-              </strong>
-
-              . Your consistent efforts,
-              technical skills, and
-              professional growth have
-              truly contributed to our
+            <p className="certificate-description-text">
+              In recognition of your outstanding performance and dedication
+              during your{" "}
+              {certificateType === "INTR" && durationMonths && (
+                <>
+                  <strong>
+                    {durationMonths}{" "}
+                    {Number(durationMonths) === 1 ? "Month" : "Months"} of
+                    Internship
+                  </strong>{" "}
+                </>
+              )}
+               in <strong>{courseName}</strong> at{" "}
+              <strong>{issuerName}</strong>. Your consistent efforts, technical
+              skills, and professional growth have truly contributed to our
               internship program.
-
               <br />
-
               <span className="certificate-appreciation-text">
-                We appreciate your
-                contribution and wish you
-                success in your future
-                endeavors.
+                We appreciate your contribution and wish you success in your
+                future endeavors.
               </span>
             </p>
-
           </section>
 
           {/* =================================================
@@ -837,95 +721,56 @@ const CertificateView = () => {
           ================================================= */}
 
           <section className="certificate-bottom">
-
             {/* QR */}
 
             <div className="certificate-qr">
-
               {verificationUrl ? (
                 <>
                   <div className="certificate-qr-box">
-
                     <QRCodeSVG
-                      value={
-                        verificationUrl
-                      }
+                      value={verificationUrl}
                       size={105}
                       bgColor="#ffffff"
                       fgColor="#000000"
                       level="H"
-                      includeMargin={
-                        false
-                      }
+                      includeMargin={false}
                     />
-
                   </div>
 
-                  <span className="certificate-qr-label">
-                    SCAN TO VERIFY
-                  </span>
+                  <span className="certificate-qr-label">SCAN TO VERIFY</span>
                 </>
               ) : (
                 <div className="certificate-qr-unavailable">
+                  <AlertCircle size={24} />
 
-                  <AlertCircle
-                    size={24}
-                  />
-
-                  <span>
-                    QR unavailable
-                  </span>
-
+                  <span>QR unavailable</span>
                 </div>
               )}
-
             </div>
 
             {/* SIGNATURE */}
 
             <div className="certificate-signature">
-
-              <img
-                src={sign}
-                alt="Authorized Signatory"
-              />
+              <img src={sign} alt="Authorized Signatory" />
 
               <div className="signature-line" />
 
-              <strong>
-                Founder &amp; CEO
-              </strong>
+              <strong>Founder &amp; CEO</strong>
 
-              <span>
-                {issuerName}
-              </span>
-
+              <span>{issuerName}</span>
             </div>
 
             {/* NIP */}
 
-            <img
-              src={nipLogo}
-              alt="NIP"
-              className="certificate-nip-logo"
-            />
+            <img src={nipLogo} alt="NIP" className="certificate-nip-logo" />
 
             {/* ISO */}
 
-            <img
-              src={isoLogo}
-              alt="ISO"
-              className="certificate-iso-logo"
-            />
+            <img src={isoLogo} alt="ISO" className="certificate-iso-logo" />
 
             {/* MSME */}
 
-            <img
-              src={msmeLogo}
-              alt="MSME"
-              className="certificate-msme-logo"
-            />
-
+            <img src={msmeLogo} alt="MSME" className="certificate-msme-logo" />
           </section>
 
           {/* =================================================
@@ -933,29 +778,15 @@ const CertificateView = () => {
           ================================================= */}
 
           <footer className="certificate-footer">
+            <span>Certificate No. {certificateNo}</span>
 
-            <span>
-              Certificate No.{" "}
-              {certificateNo}
-            </span>
+            <span className="footer-dot">•</span>
 
-            <span className="footer-dot">
-              •
-            </span>
+            <span>Issued: {issueDate}</span>
 
-            <span>
-              Issued: {issueDate}
-            </span>
+            <span className="footer-dot">•</span>
 
-            <span className="footer-dot">
-              •
-            </span>
-
-            <span>
-              Verified by{" "}
-              {issuerName}
-            </span>
-
+            <span>Verified by {issuerName}</span>
           </footer>
 
           {/* =================================================
@@ -964,24 +795,14 @@ const CertificateView = () => {
 
           {!isIssued && (
             <div className="certificate-revoked-overlay">
-
               <div className="certificate-revoked-badge">
-
-                <AlertCircle
-                  size={20}
-                />
-
+                <AlertCircle size={20} />
                 CERTIFICATE REVOKED
-
               </div>
-
             </div>
           )}
-
         </article>
-
       </div>
-
     </div>
   );
 };

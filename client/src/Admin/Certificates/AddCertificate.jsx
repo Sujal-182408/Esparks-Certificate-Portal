@@ -589,6 +589,13 @@ export default function AddCertificate() {
         );
       }
 
+      console.log("ISSUED CERTIFICATE RESPONSE:", certificate);
+console.log("ISSUED CERTIFICATE ID:", certificateId);
+console.log(
+  "NAVIGATING TO:",
+  `/admin/certificates/${certificateId}`
+);
+
       setSuccess(
         data?.message ||
           "Certificate created successfully."

@@ -33,6 +33,8 @@ export default function CertificateRequest() {
   const [additionalDetails, setAdditionalDetails] =
     useState("");
 
+const [durationMonths, setDurationMonths] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -145,42 +147,67 @@ export default function CertificateRequest() {
       return;
     }
 
+    if (cleanCertificateType === "INTR") {
+  const months = Number(durationMonths);
+
+  if (
+    !Number.isInteger(months) ||
+    months < 1 ||
+    months > 24
+  ) {
+    setError(
+      "Internship duration must be between 1 and 24 months."
+    );
+    return;
+  }
+}
+
     setSubmitting(true);
 
-    try {
-      await apiRequest(
-        "/employee/certificate-requests",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            certificateType: cleanCertificateType,
-            courseName: cleanCourseName,
-            additionalDetails:
-              cleanAdditionalDetails || null,
-          }),
-        }
-      );
-
-      setSuccess(
-        "Certificate request submitted successfully."
-      );
-
-      setCourseName("");
-      setAdditionalDetails("");
-      setCertificateType("CERT");
-    } catch (err) {
-      console.error(
-        "Certificate request submit error:",
-        err
-      );
-
-      setError(
-        err?.message ||
-          "Unable to submit certificate request."
-      );
-    } finally {
-      setSubmitting(false);
+  try {
+  await apiRequest(
+    "/employee/certificate-requests",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        certificate_type: cleanCertificateType,
+        course_name: cleanCourseName,
+        additional_details:
+          cleanAdditionalDetails || null,
+        duration_months:
+          cleanCertificateType === "INTR"
+            ? Number(durationMonths)
+            : null,
+      }),
     }
+  );
+
+  setSuccess(
+    "Certificate request submitted successfully."
+  );
+
+  setCourseName("");
+  setAdditionalDetails("");
+  setCertificateType("CERT");
+  setDurationMonths("");
+} catch (err) {
+  console.error(
+    "Certificate request submit error:",
+    err
+  );
+
+  setError(
+    err?.message ||
+      "Unable to submit certificate request."
+  );
+} finally {
+  setSubmitting(false);
+}
+ 
   }
 
   if (loading) {
@@ -620,6 +647,50 @@ export default function CertificateRequest() {
                   />
                 </div>
               </div>
+
+              {/* Internship Duration */}
+
+{certificateType === "INTR" && (
+  <div className="mt-6">
+    <label
+      htmlFor="duration_months"
+      className="mb-2 block text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500"
+    >
+      Internship duration
+    </label>
+
+    <div className="relative">
+      <Award
+        size={16}
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300/60"
+      />
+
+      <input
+        id="duration_months"
+        type="number"
+        min="1"
+        max="24"
+        step="1"
+        value={durationMonths}
+        onChange={(event) => {
+          setDurationMonths(event.target.value);
+          setError("");
+          setSuccess("");
+        }}
+        placeholder="e.g. 6"
+        className="h-12 w-full rounded-xl border border-white/[0.08] bg-black/25 pl-11 pr-24 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/30 focus:ring-4 focus:ring-cyan-300/[0.05]"
+      />
+
+      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600">
+        Months
+      </span>
+    </div>
+
+    <p className="mt-2 text-[10px] text-slate-700">
+      Enter the internship duration between 1 and 24 months.
+    </p>
+  </div>
+)}
 
               {/* Details */}
 
