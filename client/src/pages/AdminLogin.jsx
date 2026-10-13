@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -9,7 +8,10 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const API_URL = "/api";
+import {
+  adminLogin,
+  getCurrentAdmin,
+} from "../services/api";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -30,54 +32,29 @@ export default function AdminLogin() {
       // ==========================================
       // ADMIN LOGIN
       // ==========================================
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-        }),
-      });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await adminLogin(
+        email.trim(),
+        password
+      );
 
       console.log("ADMIN LOGIN RESPONSE:", data);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message || "Admin login failed."
-        );
-      }
 
       // ==========================================
       // VERIFY ADMIN SESSION
       // ==========================================
-      const meResponse = await fetch(`${API_URL}/auth/me`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
-      });
 
-      const meData = await meResponse.json().catch(() => ({}));
+      const meData = await getCurrentAdmin();
 
-      console.log("ADMIN SESSION RESPONSE:", meData);
-
-      if (!meResponse.ok) {
-        throw new Error(
-          meData?.message ||
-            "Admin session could not be verified."
-        );
-      }
+      console.log(
+        "ADMIN SESSION RESPONSE:",
+        meData
+      );
 
       // ==========================================
       // VERIFY ADMIN ROLE
       // ==========================================
+
       if (meData?.admin?.role !== "admin") {
         throw new Error(
           "Authenticated user is not an administrator."
@@ -87,6 +64,7 @@ export default function AdminLogin() {
       // ==========================================
       // VERIFY ACTIVE STATUS
       // ==========================================
+
       if (meData?.admin?.is_active !== true) {
         throw new Error(
           "This administrator account is inactive."
@@ -97,14 +75,18 @@ export default function AdminLogin() {
       console.log("ADMIN:", meData.admin);
 
       // ==========================================
-      // ALWAYS REDIRECT TO ADMIN DASHBOARD
+      // REDIRECT TO ADMIN DASHBOARD
       // ==========================================
+
       navigate("/admin", {
         replace: true,
       });
 
     } catch (err) {
-      console.error("ADMIN LOGIN ERROR:", err);
+      console.error(
+        "ADMIN LOGIN ERROR:",
+        err
+      );
 
       setError(
         err?.message ||
@@ -124,22 +106,16 @@ export default function AdminLogin() {
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
 
-        {/* Cyan atmosphere */}
         <div className="absolute left-1/2 top-[-180px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-cyan-400/[0.08] blur-[160px]" />
 
-        {/* Blue atmosphere */}
         <div className="absolute -bottom-48 -left-40 h-[500px] w-[500px] rounded-full bg-blue-500/[0.08] blur-[150px]" />
 
-        {/* Sky atmosphere */}
         <div className="absolute -right-44 top-[20%] h-[430px] w-[430px] rounded-full bg-sky-400/[0.035] blur-[150px]" />
 
-        {/* Center glow */}
         <div className="absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/[0.025] blur-[130px]" />
 
-        {/* Radial lighting */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.07),transparent_38%)]" />
 
-        {/* Subtle grid */}
         <div
           className="absolute inset-0 opacity-[0.025]"
           style={{
@@ -149,11 +125,9 @@ export default function AdminLogin() {
           }}
         />
 
-        {/* Scan line */}
         <div className="absolute left-0 right-0 top-[18%] h-px bg-gradient-to-r from-transparent via-cyan-400/20 to-transparent" />
 
       </div>
-
 
       {/* =====================================================
           ADMIN LOGIN
@@ -169,10 +143,8 @@ export default function AdminLogin() {
 
           <div className="relative">
 
-            {/* Glow */}
             <div className="absolute -inset-6 rounded-full bg-cyan-400/10 blur-2xl" />
 
-            {/* Outer glass circle */}
             <div className="relative flex h-[78px] w-[78px] items-center justify-center rounded-full border border-cyan-300/20 bg-white/[0.025] shadow-[0_0_60px_rgba(34,211,238,0.13),inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl">
 
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/[0.07] bg-gradient-to-br from-cyan-400/10 to-blue-500/5">
@@ -191,19 +163,15 @@ export default function AdminLogin() {
 
         </div>
 
-
         {/* =================================================
             MAIN GLASS CARD
         ================================================= */}
 
         <div className="relative overflow-hidden rounded-[30px] border border-white/[0.09] bg-white/[0.035] shadow-[0_35px_100px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
 
-          {/* Top reflection */}
           <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-          {/* Cyan accent */}
           <div className="mx-auto h-[2px] w-24 bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.8)]" />
-
 
           <div className="px-5 pb-7 pt-8 sm:px-8 sm:pb-9 sm:pt-9">
 
@@ -229,7 +197,6 @@ export default function AdminLogin() {
 
               </div>
 
-
               <h1 className="text-[30px] font-bold tracking-[-1.2px] text-white sm:text-[34px]">
 
                 Admin{" "}
@@ -240,20 +207,17 @@ export default function AdminLogin() {
 
               </h1>
 
-
               <p className="mx-auto mt-3 max-w-sm text-[13px] leading-6 text-slate-500 sm:text-sm">
                 Secure administrator access to ESPARKS IT SOLUTIONS.
               </p>
 
             </div>
 
-
             {/* =================================================
                 ERROR
             ================================================= */}
 
             {error && (
-
               <div
                 role="alert"
                 className="mt-7 flex items-start gap-3 rounded-2xl border border-red-400/15 bg-red-400/[0.06] p-4"
@@ -268,7 +232,6 @@ export default function AdminLogin() {
 
                 </div>
 
-
                 <div className="min-w-0">
 
                   <p className="text-xs font-bold text-red-300">
@@ -282,9 +245,7 @@ export default function AdminLogin() {
                 </div>
 
               </div>
-
             )}
-
 
             {/* =================================================
                 LOGIN FORM
@@ -295,9 +256,7 @@ export default function AdminLogin() {
               className="mt-8 space-y-5"
             >
 
-              {/* =================================================
-                  EMAIL
-              ================================================= */}
+              {/* EMAIL */}
 
               <div>
 
@@ -308,19 +267,15 @@ export default function AdminLogin() {
                   Admin email
                 </label>
 
-
                 <div className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-black/30 px-3.5 transition-all duration-300 focus-within:border-cyan-300/40 focus-within:bg-cyan-300/[0.025] focus-within:shadow-[0_0_0_4px_rgba(34,211,238,0.045)]">
 
-                  {/* Focus line */}
                   <div className="absolute bottom-0 left-1/2 h-px w-0 -translate-x-1/2 bg-gradient-to-r from-transparent via-cyan-300 to-transparent transition-all duration-500 group-focus-within:w-3/4" />
-
 
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.05] bg-white/[0.025] text-slate-500 transition duration-300 group-focus-within:border-cyan-300/10 group-focus-within:text-cyan-300">
 
                     <Mail size={18} />
 
                   </div>
-
 
                   <input
                     id="admin-email"
@@ -341,10 +296,7 @@ export default function AdminLogin() {
 
               </div>
 
-
-              {/* =================================================
-                  PASSWORD
-              ================================================= */}
+              {/* PASSWORD */}
 
               <div>
 
@@ -355,19 +307,15 @@ export default function AdminLogin() {
                   Password
                 </label>
 
-
                 <div className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-black/30 px-3.5 transition-all duration-300 focus-within:border-cyan-300/40 focus-within:bg-cyan-300/[0.025] focus-within:shadow-[0_0_0_4px_rgba(34,211,238,0.045)]">
 
-                  {/* Focus line */}
                   <div className="absolute bottom-0 left-1/2 h-px w-0 -translate-x-1/2 bg-gradient-to-r from-transparent via-cyan-300 to-transparent transition-all duration-500 group-focus-within:w-3/4" />
-
 
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.05] bg-white/[0.025] text-slate-500 transition duration-300 group-focus-within:border-cyan-300/10 group-focus-within:text-cyan-300">
 
                     <LockKeyhole size={18} />
 
                   </div>
-
 
                   <input
                     id="admin-password"
@@ -388,10 +336,7 @@ export default function AdminLogin() {
 
               </div>
 
-
-              {/* =================================================
-                  LOGIN BUTTON
-              ================================================= */}
+              {/* LOGIN BUTTON */}
 
               <button
                 type="submit"
@@ -399,29 +344,20 @@ export default function AdminLogin() {
                 className="group relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 py-4 text-sm font-extrabold text-[#021014] shadow-[0_12px_35px_rgba(34,211,238,0.12)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(34,211,238,0.2)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50"
               >
 
-                {/* Animated shine */}
                 <span className="absolute inset-y-0 -left-24 w-24 skew-x-[-20deg] bg-white/40 blur-md transition-all duration-700 group-hover:left-[115%]" />
 
-                {/* Inner border */}
                 <span className="pointer-events-none absolute inset-[1px] rounded-[15px] border border-white/20" />
 
-
                 {loading ? (
-
                   <>
-
                     <span className="relative h-5 w-5 animate-spin rounded-full border-2 border-[#021014]/25 border-t-[#021014]" />
 
                     <span className="relative">
                       Signing in...
                     </span>
-
                   </>
-
                 ) : (
-
                   <>
-
                     <span className="relative">
                       Sign In
                     </span>
@@ -430,15 +366,12 @@ export default function AdminLogin() {
                       size={18}
                       className="relative transition-transform duration-300 group-hover:translate-x-1"
                     />
-
                   </>
-
                 )}
 
               </button>
 
             </form>
-
 
             {/* =================================================
                 SECURITY INFO
@@ -453,7 +386,6 @@ export default function AdminLogin() {
                   <ShieldCheck size={16} />
 
                 </div>
-
 
                 <div>
 
@@ -472,7 +404,6 @@ export default function AdminLogin() {
 
             </div>
 
-
             {/* =================================================
                 EMPLOYEE LOGIN
             ================================================= */}
@@ -483,18 +414,15 @@ export default function AdminLogin() {
                 to="/login"
                 className="group inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-cyan-300 sm:text-sm"
               >
-
                 Employee login instead
 
                 <ArrowRight
                   size={14}
                   className="transition-transform duration-300 group-hover:translate-x-1"
                 />
-
               </Link>
 
             </div>
-
 
             {/* =================================================
                 HOME
@@ -510,7 +438,6 @@ export default function AdminLogin() {
           </div>
 
         </div>
-
 
         {/* =================================================
             FOOTER
