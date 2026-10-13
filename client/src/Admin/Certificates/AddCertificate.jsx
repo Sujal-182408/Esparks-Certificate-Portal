@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
-
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Award,
   CalendarDays,
@@ -17,8 +13,7 @@ import {
 } from "lucide-react";
 
 import BackButton from "../../components/BackButton";
-
-const API_URL = "/api";
+import { apiRequest } from "../../services/api";
 
 const CERTIFICATE_TYPES = [
   {
@@ -40,17 +35,20 @@ export default function AddCertificate() {
 
   const [searchParams] = useSearchParams();
 
-  /*
-   * IMPORTANT:
-   *
-   * requestId identifies the certificate request.
-   *
-   * It is NOT the certificate ID.
-   *
-   * Example:
-   *
-   * /admin/certificates/create?requestId=123
-   */
+  /* ============================================================
+     REQUEST ID
+
+     IMPORTANT:
+     The certificate must always be created from
+     a verified certificate request.
+
+     Expected URL:
+
+     /admin/certificates/create?requestId=14
+
+     requestId is the certificate request ID.
+     It is NOT the certificate ID.
+  ============================================================ */
 
   const requestId = useMemo(() => {
     const value = searchParams.get("requestId");
@@ -62,17 +60,17 @@ export default function AddCertificate() {
     return value.trim();
   }, [searchParams]);
 
-  /* ==========================================================
+  /* ============================================================
      REQUEST ID VALIDATION
-  ========================================================== */
+  ============================================================ */
 
   const validRequestId = useMemo(() => {
     return /^[1-9]\d*$/.test(requestId);
   }, [requestId]);
 
-  /* ==========================================================
+  /* ============================================================
      FORM
-  ========================================================== */
+  ============================================================ */
 
   const [form, setForm] = useState({
     certificateType: "CERT",
@@ -81,9 +79,9 @@ export default function AddCertificate() {
     issueDate: "",
   });
 
-  /* ==========================================================
+  /* ============================================================
      REQUEST INFORMATION
-  ========================================================== */
+  ============================================================ */
 
   const [request, setRequest] = useState(null);
 
@@ -93,9 +91,9 @@ export default function AddCertificate() {
   const [requestError, setRequestError] =
     useState("");
 
-  /* ==========================================================
+  /* ============================================================
      CREATE STATE
-  ========================================================== */
+  ============================================================ */
 
   const [loading, setLoading] = useState(false);
 
@@ -106,9 +104,9 @@ export default function AddCertificate() {
   const [createdCertificate, setCreatedCertificate] =
     useState(null);
 
-  /* ==========================================================
+  /* ============================================================
      LOAD CERTIFICATE REQUEST
-  ========================================================== */
+  ============================================================ */
 
   useEffect(() => {
     let mounted = true;
@@ -123,61 +121,22 @@ export default function AddCertificate() {
         setRequestError("");
 
         /*
-         * This endpoint should return the request
-         * from the database.
-         *
-         * The backend must resolve the employee
-         * using requestId.
-         */
+          IMPORTANT:
 
-        const response = await fetch(
-          `${API_URL}/admin/certificate-requests/${encodeURIComponent(
+          Do not trust employee information from the URL.
+
+          The backend resolves the complete request
+          from the database using requestId.
+        */
+
+        const data = await apiRequest(
+          `/admin/certificate-requests/${encodeURIComponent(
             requestId
-          )}`,
-          {
-            method: "GET",
-
-            credentials: "include",
-
-            headers: {
-              Accept: "application/json",
-            },
-          }
+          )}`
         );
-
-        const data = await response
-          .json()
-          .catch(() => ({}));
 
         if (!mounted) {
           return;
-        }
-
-        if (response.status === 401) {
-          throw new Error(
-            "Admin authentication required. Please login again."
-          );
-        }
-
-        if (response.status === 403) {
-          throw new Error(
-            data?.message ||
-              "You are not authorized to view this certificate request."
-          );
-        }
-
-        if (response.status === 404) {
-          throw new Error(
-            data?.message ||
-              "Certificate request was not found."
-          );
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "Failed to load certificate request."
-          );
         }
 
         const loadedRequest =
@@ -190,18 +149,27 @@ export default function AddCertificate() {
         }
 
         /*
-         * Security:
-         *
-         * Employee information comes from the
-         * backend/database, not from the URL.
-         */
+          Security validation:
+
+          Make sure the backend returned the same
+          request ID that was supplied in the URL.
+        */
+
+        if (
+          Number(loadedRequest.id) !==
+          Number(requestId)
+        ) {
+          throw new Error(
+            "Certificate request validation failed."
+          );
+        }
 
         setRequest(loadedRequest);
 
         /*
-         * Prefill certificate information from
-         * the actual request.
-         */
+          Prefill certificate information from
+          the actual verified request.
+        */
 
         setForm((previous) => ({
           ...previous,
@@ -242,9 +210,9 @@ export default function AddCertificate() {
     };
   }, [requestId, validRequestId]);
 
-  /* ==========================================================
+  /* ============================================================
      HANDLE INPUT
-  ========================================================== */
+  ============================================================ */
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -259,9 +227,9 @@ export default function AddCertificate() {
     setCreatedCertificate(null);
   }
 
-  /* ==========================================================
+  /* ============================================================
      HANDLE SUBMIT
-  ========================================================== */
+  ============================================================ */
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -276,9 +244,9 @@ export default function AddCertificate() {
     setCreatedCertificate(null);
 
     try {
-      /* ======================================================
+      /* ========================================================
          REQUEST ID
-      ====================================================== */
+      ======================================================== */
 
       if (!requestId) {
         throw new Error(
@@ -292,9 +260,9 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          REQUEST MUST BE LOADED
-      ====================================================== */
+      ======================================================== */
 
       if (!request?.id) {
         throw new Error(
@@ -303,11 +271,11 @@ export default function AddCertificate() {
       }
 
       /*
-       * Extra protection:
-       *
-       * Make sure the request loaded from the backend
-       * matches the request ID in the URL.
-       */
+        Extra protection:
+
+        Make sure the loaded request matches
+        the request ID in the URL.
+      */
 
       if (
         Number(request.id) !==
@@ -318,9 +286,9 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          REQUEST STATUS
-      ====================================================== */
+      ======================================================== */
 
       if (
         request.status &&
@@ -331,35 +299,31 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          CLEAN VALUES
-      ====================================================== */
+      ======================================================== */
 
-      const certificateType =
-        String(
-          form.certificateType || ""
-        )
-          .trim()
-          .toUpperCase();
+      const certificateType = String(
+        form.certificateType || ""
+      )
+        .trim()
+        .toUpperCase();
 
-      const courseName =
-        String(
-          form.courseName || ""
-        ).trim();
+      const courseName = String(
+        form.courseName || ""
+      ).trim();
 
-      const issuerName =
-        String(
-          form.issuerName || ""
-        ).trim();
+      const issuerName = String(
+        form.issuerName || ""
+      ).trim();
 
-      const issueDate =
-        String(
-          form.issueDate || ""
-        ).trim();
+      const issueDate = String(
+        form.issueDate || ""
+      ).trim();
 
-      /* ======================================================
+      /* ========================================================
          CERTIFICATE TYPE
-      ====================================================== */
+      ======================================================== */
 
       if (
         !CERTIFICATE_TYPES.some(
@@ -372,9 +336,9 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          COURSE
-      ====================================================== */
+      ======================================================== */
 
       if (!courseName) {
         throw new Error(
@@ -388,9 +352,9 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          ISSUER
-      ====================================================== */
+      ======================================================== */
 
       if (!issuerName) {
         throw new Error(
@@ -400,13 +364,13 @@ export default function AddCertificate() {
 
       if (issuerName.length > 200) {
         throw new Error(
-          "Issuer name must be at most 200 characters."
+          "Issuer name is too long."
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          DATE
-      ====================================================== */
+      ======================================================== */
 
       if (!issueDate) {
         throw new Error(
@@ -424,15 +388,14 @@ export default function AddCertificate() {
         );
       }
 
-      /* ======================================================
+      /* ========================================================
          CREATE CERTIFICATE
+         
+         IMPORTANT SECURITY RULE:
 
-         SECURITY:
-
-         DO NOT SEND:
-
-         - employeeEmail
+         Do NOT send:
          - employeeId
+         - employeeEmail
          - recipientName
          - certificateId
          - certificateNo
@@ -440,26 +403,15 @@ export default function AddCertificate() {
 
          The backend resolves employee information
          from requestId.
-      ====================================================== */
+      ======================================================== */
 
-      const response = await fetch(
-        `${API_URL}/admin/certificates`,
+      const data = await apiRequest(
+        "/admin/certificates",
         {
           method: "POST",
 
-          credentials: "include",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Accept:
-              "application/json",
-          },
-
           body: JSON.stringify({
-            requestId:
-              Number(requestId),
+            requestId: Number(requestId),
 
             certificateType,
 
@@ -472,93 +424,14 @@ export default function AddCertificate() {
         }
       );
 
-      /* ======================================================
-         RESPONSE
-      ====================================================== */
-
-      const data =
-        await response
-          .json()
-          .catch(() => ({}));
-
       console.log(
-        "Create certificate:",
-        response.status,
+        "Create certificate response:",
         data
       );
 
-      /* ======================================================
-         AUTHENTICATION
-      ====================================================== */
-
-      if (response.status === 401) {
-        throw new Error(
-          "Admin authentication required. Please login again."
-        );
-      }
-
-      /* ======================================================
-         FORBIDDEN
-      ====================================================== */
-
-      if (response.status === 403) {
-        throw new Error(
-          data?.message ||
-            "You are not authorized to create this certificate."
-        );
-      }
-
-      /* ======================================================
-         NOT FOUND
-      ====================================================== */
-
-      if (response.status === 404) {
-        throw new Error(
-          data?.message ||
-            "Certificate request was not found."
-        );
-      }
-
-      /* ======================================================
-         CONFLICT
-      ====================================================== */
-
-      if (response.status === 409) {
-        throw new Error(
-          data?.message ||
-            "This certificate request has already been processed."
-        );
-      }
-
-      /* ======================================================
-         VALIDATION
-      ====================================================== */
-
-      if (
-        response.status === 400 ||
-        response.status === 422
-      ) {
-        throw new Error(
-          data?.message ||
-            "The certificate information is invalid."
-        );
-      }
-
-      /* ======================================================
-         OTHER SERVER ERROR
-      ====================================================== */
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            data?.error ||
-            "Failed to create certificate."
-        );
-      }
-
-      /* ======================================================
+      /* ========================================================
          SUCCESS
-      ====================================================== */
+      ======================================================== */
 
       const certificate =
         data?.certificate || null;
@@ -570,13 +443,14 @@ export default function AddCertificate() {
       }
 
       /*
-       * Make sure the returned ID is a valid
-       * positive integer before using it
-       * in the admin URL.
-       */
+        Convert returned ID to a number.
 
-      const certificateId =
-        Number(certificate.id);
+        The certificate ID is generated by the backend.
+      */
+
+      const certificateId = Number(
+        certificate.id
+      );
 
       if (
         !Number.isInteger(
@@ -589,12 +463,20 @@ export default function AddCertificate() {
         );
       }
 
-      console.log("ISSUED CERTIFICATE RESPONSE:", certificate);
-console.log("ISSUED CERTIFICATE ID:", certificateId);
-console.log(
-  "NAVIGATING TO:",
-  `/admin/certificates/${certificateId}`
-);
+      console.log(
+        "ISSUED CERTIFICATE RESPONSE:",
+        certificate
+      );
+
+      console.log(
+        "ISSUED CERTIFICATE ID:",
+        certificateId
+      );
+
+      console.log(
+        "NAVIGATING TO:",
+        `/admin/certificates/${certificateId}`
+      );
 
       setSuccess(
         data?.message ||
@@ -605,32 +487,27 @@ console.log(
         certificate
       );
 
-      /* ======================================================
-         IMPORTANT
+      /*
+        IMPORTANT:
 
-         requestId and certificateId are DIFFERENT.
+        requestId and certificateId are DIFFERENT.
 
-         We navigate using the actual certificate ID
-         returned by the backend.
+        Example:
 
-         Example:
+        requestId     = 14
+        certificateId = 21
 
-         requestId     = 123
-         certificateId = 87
+        Correct:
 
-         Correct:
+        /admin/certificates/21
 
-         /admin/certificates/87
+        NOT:
 
-         NOT:
-
-         /admin/certificates/123
-      ====================================================== */
+        /admin/certificates/14
+      */
 
       navigate(
-        `/admin/certificates/${encodeURIComponent(
-          certificateId
-        )}`,
+        `/admin/certificates/${certificateId}`,
         {
           replace: true,
         }
@@ -650,9 +527,9 @@ console.log(
     }
   }
 
-  /* ==========================================================
+  /* ============================================================
      INVALID REQUEST PAGE
-  ========================================================== */
+  ============================================================ */
 
   if (!requestId || !validRequestId) {
     return (
@@ -667,6 +544,7 @@ console.log(
             aria-labelledby="invalid-request-title"
             className="rounded-3xl border border-red-400/20 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
           >
+
             <div className="mb-5 inline-flex rounded-2xl bg-red-400/10 p-3 text-red-300">
               <AlertCircle
                 size={30}
@@ -686,6 +564,14 @@ console.log(
               a valid certificate request ID.
             </p>
 
+            <p className="mt-2 text-sm text-slate-500">
+              Expected URL format:
+              <br />
+              <code className="text-cyan-300">
+                /admin/certificates/create?requestId=123
+              </code>
+            </p>
+
             <button
               type="button"
               onClick={() =>
@@ -697,6 +583,7 @@ console.log(
             >
               Back to Certificate Requests
             </button>
+
           </section>
 
         </div>
@@ -704,9 +591,9 @@ console.log(
     );
   }
 
-  /* ==========================================================
+  /* ============================================================
      LOADING REQUEST
-  ========================================================== */
+  ============================================================ */
 
   if (requestLoading) {
     return (
@@ -721,6 +608,7 @@ console.log(
             aria-live="polite"
             className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-center shadow-2xl backdrop-blur-xl"
           >
+
             <Loader2
               size={34}
               className="mx-auto animate-spin text-cyan-400"
@@ -734,6 +622,7 @@ console.log(
             <p className="mt-2 text-sm text-slate-500">
               Request #{requestId}
             </p>
+
           </section>
 
         </div>
@@ -741,9 +630,9 @@ console.log(
     );
   }
 
-  /* ==========================================================
+  /* ============================================================
      REQUEST LOAD ERROR
-  ========================================================== */
+  ============================================================ */
 
   if (requestError || !request) {
     return (
@@ -758,6 +647,7 @@ console.log(
             aria-live="assertive"
             className="rounded-3xl border border-red-400/20 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
           >
+
             <div className="mb-5 inline-flex rounded-2xl bg-red-400/10 p-3 text-red-300">
               <AlertCircle
                 size={30}
@@ -785,6 +675,7 @@ console.log(
             >
               Back to Certificate Requests
             </button>
+
           </section>
 
         </div>
@@ -792,25 +683,26 @@ console.log(
     );
   }
 
-  /* ==========================================================
+  /* ============================================================
      UI
-  ========================================================== */
+  ============================================================ */
 
   return (
     <main className="min-h-screen bg-midnight px-4 py-10 sm:px-6">
+
       <div className="mx-auto w-full max-w-3xl">
 
-        {/* ====================================================
+        {/* ======================================================
             BACK BUTTON
-        ==================================================== */}
+        ====================================================== */}
 
         <div className="mb-6">
           <BackButton />
         </div>
 
-        {/* ====================================================
+        {/* ======================================================
             HEADER
-        ==================================================== */}
+        ====================================================== */}
 
         <header className="mb-8">
 
@@ -832,9 +724,9 @@ console.log(
 
         </header>
 
-        {/* ====================================================
+        {/* ======================================================
             REQUEST INFORMATION
-        ==================================================== */}
+        ====================================================== */}
 
         <section
           aria-labelledby="request-information-title"
@@ -904,6 +796,19 @@ console.log(
                   </p>
                 </div>
 
+                {request.duration_months && (
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Duration
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-white">
+                      {request.duration_months}{" "}
+                      months
+                    </p>
+                  </div>
+                )}
+
               </div>
 
             </div>
@@ -912,9 +817,9 @@ console.log(
 
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             SECURITY INFORMATION
-        ==================================================== */}
+        ====================================================== */}
 
         <section
           aria-labelledby="security-title"
@@ -952,9 +857,9 @@ console.log(
 
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             SUCCESS
-        ==================================================== */}
+        ====================================================== */}
 
         {success && (
           <section
@@ -979,6 +884,7 @@ console.log(
                 {createdCertificate?.certificate_no && (
                   <p className="mt-2 text-sm text-emerald-300/80">
                     Certificate No:{" "}
+
                     <strong className="text-white">
                       {
                         createdCertificate.certificate_no
@@ -994,9 +900,9 @@ console.log(
           </section>
         )}
 
-        {/* ====================================================
+        {/* ======================================================
             ERROR
-        ==================================================== */}
+        ====================================================== */}
 
         {error && (
           <section
@@ -1025,9 +931,9 @@ console.log(
           </section>
         )}
 
-        {/* ====================================================
+        {/* ======================================================
             FORM
-        ==================================================== */}
+        ====================================================== */}
 
         <form
           onSubmit={handleSubmit}
@@ -1419,6 +1325,7 @@ console.log(
         </form>
 
       </div>
+
     </main>
   );
 }
