@@ -11,11 +11,10 @@ import {
 } from "lucide-react";
 
 import { apiRequest } from "../../services/api";
-
 import companyLogo from "../../assets/logo.webp";
 import sign from "../../assets/sign.webp";
-import nipLogo from "../assets/nipLogo.webp";
-import msmeLogo from "../assets/msmeLogo.webp";
+import nipLogo from "../../assets/nipLogo.webp";
+import msmeLogo from "../../assets/msmeLogo.webp";
 import isoLogo from "../../assets/iso-logo.webp";
 
 import "../../pages/CertificateView.css";
