@@ -10,38 +10,45 @@ const API_URL =
 export async function apiRequest(path, options = {}) {
   const url = `${API_URL}${path}`;
 
-  const response = await fetch(url, {
-    ...options,
+  try {
+    const response = await fetch(url, {
+      ...options,
 
-    // Send/receive authentication cookies
-    credentials: "include",
+      // Required for authentication cookies
+      credentials: "include",
 
-    headers: {
-      ...(options.body
-        ? {
-            "Content-Type": "application/json",
-          }
-        : {}),
-      ...(options.headers || {}),
-    },
-  });
+      headers: {
+        ...(options.body
+          ? {
+              "Content-Type": "application/json",
+            }
+          : {}),
+        ...(options.headers || {}),
+      },
+    });
 
-  const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const error = new Error(
-      data?.message ||
-        data?.error ||
-        `Request failed with status ${response.status}`
-    );
+    if (!response.ok) {
+      const error = new Error(
+        data?.message ||
+          data?.error ||
+          `Request failed with status ${response.status}`
+      );
 
-    error.status = response.status;
-    error.data = data;
+      error.status = response.status;
+      error.data = data;
+      error.url = url;
+
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`API Error [${options.method || "GET"}] ${url}:`, error);
 
     throw error;
   }
-
-  return data;
 }
 
 /* =========================================================
@@ -97,7 +104,6 @@ export function getCurrentAdmin() {
   return apiRequest("/auth/me");
 }
 
-// Alias for existing components that use adminMe()
 export function adminMe() {
   return getCurrentAdmin();
 }
@@ -141,7 +147,7 @@ export function getCertificates() {
 }
 
 export function getCertificate(id) {
-  return apiRequest(`/certificates/${id}`);
+  return apiRequest(`/certificates/${encodeURIComponent(id)}`);
 }
 
 export function createCertificate(certificateData) {
@@ -152,14 +158,14 @@ export function createCertificate(certificateData) {
 }
 
 export function updateCertificate(id, certificateData) {
-  return apiRequest(`/certificates/${id}`, {
+  return apiRequest(`/certificates/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: JSON.stringify(certificateData),
   });
 }
 
 export function deleteCertificate(id) {
-  return apiRequest(`/certificates/${id}`, {
+  return apiRequest(`/certificates/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }
@@ -204,7 +210,7 @@ export function getAdminUnreadNotificationCount() {
 
 export function markAdminNotificationAsRead(id) {
   return apiRequest(
-    `/admin/notifications/${id}/read`,
+    `/admin/notifications/${encodeURIComponent(id)}/read`,
     {
       method: "PATCH",
     }
@@ -236,7 +242,7 @@ export function getEmployeeUnreadNotificationCount() {
 
 export function markEmployeeNotificationAsRead(id) {
   return apiRequest(
-    `/employee/notifications/${id}/read`,
+    `/employee/notifications/${encodeURIComponent(id)}/read`,
     {
       method: "PATCH",
     }
