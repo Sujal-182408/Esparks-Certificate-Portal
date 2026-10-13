@@ -19,11 +19,15 @@ import {
 import "./AdminDashboard.css";
 
 import {
+  getCurrentAdmin,
+  getAdminEmployees,
+  getAdminCertificates,
+  getAdminCertificateRequests,
+  adminLogout,
   getAdminNotifications,
   markAdminNotificationAsRead,
+  markAllAdminNotificationsAsRead,
 } from "../services/api";
-
-const API_BASE = "/api";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -53,17 +57,17 @@ export default function AdminDashboard() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const data = await getCurrentAdmin();
 
-      const data = await response.json().catch(() => ({}));
+      console.log(
+        "🔐 AdminDashboard /me:",
+        data
+      );
 
-      if (!response.ok || data?.admin?.role !== "admin") {
+      if (
+        data?.admin?.role !== "admin" ||
+        data?.admin?.is_active !== true
+      ) {
         navigate("/admin/login", {
           replace: true,
         });
@@ -76,7 +80,10 @@ export default function AdminDashboard() {
       await loadDashboardStats();
       await loadNotifications();
     } catch (error) {
-      console.error("Admin session error:", error);
+      console.error(
+        "Admin session error:",
+        error
+      );
 
       navigate("/admin/login", {
         replace: true,
@@ -104,10 +111,15 @@ export default function AdminDashboard() {
 
       setStats((prev) => ({
         ...prev,
-        notifications: Number(data?.unreadCount || 0),
+        notifications: Number(
+          data?.unreadCount || 0
+        ),
       }));
     } catch (error) {
-      console.error("Admin notifications error:", error);
+      console.error(
+        "Admin notifications error:",
+        error
+      );
     }
   }
 
@@ -120,21 +132,13 @@ export default function AdminDashboard() {
   async function loadDashboardStats() {
     try {
       const [
-        employeesResponse,
-        certificatesResponse,
-        requestsResponse,
+        employeesData,
+        certificatesData,
+        requestsData,
       ] = await Promise.all([
-        fetch(`${API_BASE}/admin/employees`, {
-          credentials: "include",
-        }).catch(() => null),
-
-        fetch(`${API_BASE}/admin/certificates`, {
-          credentials: "include",
-        }).catch(() => null),
-
-        fetch(`${API_BASE}/admin/certificate-requests`, {
-          credentials: "include",
-        }).catch(() => null),
+        getAdminEmployees(),
+        getAdminCertificates(),
+        getAdminCertificateRequests(),
       ]);
 
       let employees = 0;
@@ -147,20 +151,16 @@ export default function AdminDashboard() {
       ==========================================================
       */
 
-      if (employeesResponse?.ok) {
-        const data = await employeesResponse
-          .json()
-          .catch(() => ({}));
+      const employeeList =
+        employeesData?.employees ||
+        employeesData?.data ||
+        [];
 
-        const employeeList =
-          data?.employees ||
-          data?.data ||
-          [];
-
-        employees = Array.isArray(employeeList)
-          ? employeeList.length
-          : Number(data?.count || 0);
-      }
+      employees = Array.isArray(employeeList)
+        ? employeeList.length
+        : Number(
+            employeesData?.count || 0
+          );
 
       /*
       ==========================================================
@@ -168,20 +168,18 @@ export default function AdminDashboard() {
       ==========================================================
       */
 
-      if (certificatesResponse?.ok) {
-        const data = await certificatesResponse
-          .json()
-          .catch(() => ({}));
+      const certificateList =
+        certificatesData?.certificates ||
+        certificatesData?.data ||
+        [];
 
-        const certificateList =
-          data?.certificates ||
-          data?.data ||
-          [];
-
-        certificates = Array.isArray(certificateList)
-          ? certificateList.length
-          : Number(data?.count || 0);
-      }
+      certificates = Array.isArray(
+        certificateList
+      )
+        ? certificateList.length
+        : Number(
+            certificatesData?.count || 0
+          );
 
       /*
       ==========================================================
@@ -189,28 +187,23 @@ export default function AdminDashboard() {
       ==========================================================
       */
 
-      if (requestsResponse?.ok) {
-        const data = await requestsResponse
-          .json()
-          .catch(() => ({}));
+      const requestList =
+        requestsData?.requests ||
+        requestsData?.data ||
+        [];
 
-        const requestList =
-          data?.requests ||
-          data?.data ||
-          [];
-
-        if (Array.isArray(requestList)) {
-          pendingRequests = requestList.filter(
+      if (Array.isArray(requestList)) {
+        pendingRequests =
+          requestList.filter(
             (item) =>
-              String(item?.status).toLowerCase() ===
-              "pending"
+              String(item?.status)
+                .toLowerCase() === "pending"
           ).length;
-        }
       }
 
       /*
       ==========================================================
-      UPDATE ONLY DASHBOARD STATISTICS
+      UPDATE DASHBOARD STATISTICS
       ==========================================================
       */
 
@@ -238,16 +231,16 @@ export default function AdminDashboard() {
     try {
       setLoggingOut(true);
 
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await adminLogout();
 
       navigate("/admin/login", {
         replace: true,
       });
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error(
+        "Logout error:",
+        error
+      );
 
       navigate("/admin/login", {
         replace: true,
@@ -265,35 +258,17 @@ export default function AdminDashboard() {
 
   async function handleMarkAllNotificationsRead() {
     try {
-      console.log("Mark all read clicked");
-
-      const response = await fetch(
-        `${API_BASE}/admin/notifications/read-all`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
-        }
+      console.log(
+        "Mark all read clicked"
       );
 
-      const data = await response
-        .json()
-        .catch(() => ({}));
+      const data =
+        await markAllAdminNotificationsAsRead();
 
       console.log(
         "Mark all read response:",
-        response.status,
         data
       );
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            "Failed to mark notifications as read."
-        );
-      }
 
       setNotifications((prev) =>
         prev.map((item) => ({
@@ -328,7 +303,9 @@ export default function AdminDashboard() {
           <ShieldCheck size={28} />
         </div>
 
-        <p>Loading administration panel...</p>
+        <p>
+          Loading administration panel...
+        </p>
       </main>
     );
   }
@@ -406,10 +383,6 @@ export default function AdminDashboard() {
                 {notificationOpen && (
                   <div className="admin-notification-dropdown">
 
-                    {/* =========================
-                        NOTIFICATION HEADER
-                    ========================= */}
-
                     <div className="admin-notification-header">
 
                       <div>
@@ -434,10 +407,6 @@ export default function AdminDashboard() {
                       )}
                     </div>
 
-                    {/* =========================
-                        NOTIFICATION LIST
-                    ========================= */}
-
                     <div className="admin-notification-list">
 
                       {notifications.length === 0 ? (
@@ -451,115 +420,123 @@ export default function AdminDashboard() {
                       ) : (
                         notifications
                           .slice(0, 10)
-                          .map((notification) => (
-                            <button
-                              type="button"
-                              key={notification.id}
-                              className={`admin-notification-item ${
-                                notification.is_read
-                                  ? ""
-                                  : "unread"
-                              }`}
-                              onClick={async () => {
-                                try {
-                                  if (
-                                    !notification.is_read
-                                  ) {
-                                    await markAdminNotificationAsRead(
-                                      notification.id
-                                    );
-
-                                    setNotifications(
-                                      (prev) =>
-                                        prev.map(
-                                          (item) =>
-                                            item.id ===
-                                            notification.id
-                                              ? {
-                                                  ...item,
-                                                  is_read:
-                                                    true,
-                                                }
-                                              : item
-                                        )
-                                    );
-
-                                    setStats(
-                                      (prev) => ({
-                                        ...prev,
-                                        notifications:
-                                          Math.max(
-                                            0,
-                                            prev.notifications -
-                                              1
-                                          ),
-                                      })
-                                    );
-                                  }
-
-                                  if (
-                                    notification.certificate_request_id
-                                  ) {
-                                    navigate(
-                                      `/admin/certificates/create?requestId=${encodeURIComponent(
-                                        notification.certificate_request_id
-                                      )}`
-                                    );
-
-                                    setNotificationOpen(
-                                      false
-                                    );
-                                  }
-                                } catch (error) {
-                                  console.error(
-                                    "Notification click error:",
-                                    error
-                                  );
+                          .map(
+                            (notification) => (
+                              <button
+                                type="button"
+                                key={
+                                  notification.id
                                 }
-                              }}
-                            >
+                                className={`admin-notification-item ${
+                                  notification.is_read
+                                    ? ""
+                                    : "unread"
+                                }`}
+                                onClick={async () => {
+                                  try {
+                                    if (
+                                      !notification.is_read
+                                    ) {
+                                      await markAdminNotificationAsRead(
+                                        notification.id
+                                      );
 
-                              <div className="admin-notification-icon">
-                                <Bell size={17} />
-                              </div>
+                                      setNotifications(
+                                        (prev) =>
+                                          prev.map(
+                                            (item) =>
+                                              item.id ===
+                                              notification.id
+                                                ? {
+                                                    ...item,
+                                                    is_read:
+                                                      true,
+                                                  }
+                                                : item
+                                          )
+                                      );
 
-                              <div className="admin-notification-content">
+                                      setStats(
+                                        (prev) => ({
+                                          ...prev,
+                                          notifications:
+                                            Math.max(
+                                              0,
+                                              prev.notifications -
+                                                1
+                                            ),
+                                        })
+                                      );
+                                    }
 
-                                <strong>
-                                  {notification.title}
-                                </strong>
+                                    if (
+                                      notification.certificate_request_id
+                                    ) {
+                                      navigate(
+                                        `/admin/certificates/create?requestId=${encodeURIComponent(
+                                          notification.certificate_request_id
+                                        )}`
+                                      );
 
-                                <p>
-                                  {notification.message}
-                                </p>
+                                      setNotificationOpen(
+                                        false
+                                      );
+                                    }
+                                  } catch (
+                                    error
+                                  ) {
+                                    console.error(
+                                      "Notification click error:",
+                                      error
+                                    );
+                                  }
+                                }}
+                              >
 
-                                <small>
-                                  {new Date(
-                                    notification.created_at
-                                  ).toLocaleString()}
-                                </small>
+                                <div className="admin-notification-icon">
+                                  <Bell size={17} />
+                                </div>
 
-                              </div>
+                                <div className="admin-notification-content">
 
-                              {!notification.is_read && (
-                                <span className="admin-notification-dot" />
-                              )}
+                                  <strong>
+                                    {
+                                      notification.title
+                                    }
+                                  </strong>
 
-                            </button>
-                          ))
+                                  <p>
+                                    {
+                                      notification.message
+                                    }
+                                  </p>
+
+                                  <small>
+                                    {new Date(
+                                      notification.created_at
+                                    ).toLocaleString()}
+                                  </small>
+
+                                </div>
+
+                                {!notification.is_read && (
+                                  <span className="admin-notification-dot" />
+                                )}
+
+                              </button>
+                            )
+                          )
                       )}
 
                     </div>
-
-                    {/* =========================
-                        NOTIFICATION FOOTER
-                    ========================= */}
 
                     <button
                       type="button"
                       className="admin-notification-footer"
                       onClick={() => {
-                        setNotificationOpen(false);
+                        setNotificationOpen(
+                          false
+                        );
 
                         navigate(
                           "/admin/certificate-requests"
@@ -662,7 +639,7 @@ export default function AdminDashboard() {
             <div className="admin-hero-actions">
 
               <Link
-                to="/admin/certificates/new"
+                to="/admin/certificates/create"
                 className="admin-primary-button"
               >
                 <FilePlus2 size={18} />
@@ -861,9 +838,7 @@ export default function AdminDashboard() {
 
           <div className="workspace-grid">
 
-            {/* =========================
-                CERTIFICATES
-            ========================= */}
+            {/* CERTIFICATES */}
 
             <Link
               to="/admin/certificates"
@@ -902,12 +877,10 @@ export default function AdminDashboard() {
 
             </Link>
 
-            {/* =========================
-                ISSUE CERTIFICATE
-            ========================= */}
+            {/* ISSUE CERTIFICATE */}
 
             <Link
-              to="/admin/certificates/new"
+              to="/admin/certificates/create"
               className="workspace-card workspace-blue"
             >
 
@@ -943,9 +916,7 @@ export default function AdminDashboard() {
 
             </Link>
 
-            {/* =========================
-                CERTIFICATE REQUESTS
-            ========================= */}
+            {/* CERTIFICATE REQUESTS */}
 
             <Link
               to="/admin/certificate-requests"
@@ -988,9 +959,7 @@ export default function AdminDashboard() {
 
             </Link>
 
-            {/* =========================
-                EMPLOYEES
-            ========================= */}
+            {/* EMPLOYEES */}
 
             <Link
               to="/admin/employees"
