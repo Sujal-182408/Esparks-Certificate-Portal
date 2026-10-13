@@ -3,14 +3,17 @@
 const API_URL =
   "https://esparks-certificate-portal-server.vercel.app/api";
 
+/* =========================================================
+   BASE API REQUEST
+========================================================= */
+
 export async function apiRequest(path, options = {}) {
   const url = `${API_URL}${path}`;
 
   const response = await fetch(url, {
     ...options,
 
-    // IMPORTANT:
-    // Allows browser to send and receive session cookies
+    // Send/receive authentication cookies
     credentials: "include",
 
     headers: {
@@ -94,7 +97,7 @@ export function getCurrentAdmin() {
   return apiRequest("/auth/me");
 }
 
-// Alias in case your existing components use adminMe()
+// Alias for existing components that use adminMe()
 export function adminMe() {
   return getCurrentAdmin();
 }
@@ -103,6 +106,30 @@ export function adminLogout() {
   return apiRequest("/auth/logout", {
     method: "POST",
   });
+}
+
+/* =========================================================
+   ADMIN EMPLOYEES
+========================================================= */
+
+export function getAdminEmployees() {
+  return apiRequest("/admin/employees");
+}
+
+/* =========================================================
+   ADMIN CERTIFICATES
+========================================================= */
+
+export function getAdminCertificates() {
+  return apiRequest("/admin/certificates");
+}
+
+/* =========================================================
+   ADMIN CERTIFICATE REQUESTS
+========================================================= */
+
+export function getAdminCertificateRequests() {
+  return apiRequest("/admin/certificate-requests");
 }
 
 /* =========================================================
@@ -142,7 +169,9 @@ export function deleteCertificate(id) {
 ========================================================= */
 
 export function verifyCertificate(token) {
-  return apiRequest(`/verify/${encodeURIComponent(token)}`);
+  return apiRequest(
+    `/verify/${encodeURIComponent(token)}`
+  );
 }
 
 /* =========================================================
@@ -168,19 +197,27 @@ export function getAdminNotifications() {
 }
 
 export function getAdminUnreadNotificationCount() {
-  return apiRequest("/admin/notifications/unread-count");
+  return apiRequest(
+    "/admin/notifications/unread-count"
+  );
 }
 
 export function markAdminNotificationAsRead(id) {
-  return apiRequest(`/admin/notifications/${id}/read`, {
-    method: "PATCH",
-  });
+  return apiRequest(
+    `/admin/notifications/${id}/read`,
+    {
+      method: "PATCH",
+    }
+  );
 }
 
 export function markAllAdminNotificationsAsRead() {
-  return apiRequest("/admin/notifications/read-all", {
-    method: "PATCH",
-  });
+  return apiRequest(
+    "/admin/notifications/read-all",
+    {
+      method: "PATCH",
+    }
+  );
 }
 
 /* =========================================================
@@ -192,17 +229,25 @@ export function getEmployeeNotifications() {
 }
 
 export function getEmployeeUnreadNotificationCount() {
-  return apiRequest("/employee/notifications/unread-count");
+  return apiRequest(
+    "/employee/notifications/unread-count"
+  );
 }
 
 export function markEmployeeNotificationAsRead(id) {
-  return apiRequest(`/employee/notifications/${id}/read`, {
-    method: "PATCH",
-  });
+  return apiRequest(
+    `/employee/notifications/${id}/read`,
+    {
+      method: "PATCH",
+    }
+  );
 }
 
 export function markAllEmployeeNotificationsAsRead() {
-  return apiRequest("/employee/notifications/read-all", {
-    method: "PATCH",
-  });
+  return apiRequest(
+    "/employee/notifications/read-all",
+    {
+      method: "PATCH",
+    }
+  );
 }
