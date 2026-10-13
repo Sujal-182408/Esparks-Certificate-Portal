@@ -1,6 +1,7 @@
 // src/services/api.js
 
-const API_URL = "/api";
+const API_URL =
+  "https://esparks-certificate-portal-server.vercel.app/api";
 
 export async function apiRequest(path, options = {}) {
   const url = `${API_URL}${path}`;
