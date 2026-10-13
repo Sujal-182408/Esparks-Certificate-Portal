@@ -1,66 +1,68 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../services/api";
+import { apiRequest } from "../../services/api";
 import "./CertificateRequests.css";
 
 const formatDate = (date) => {
   if (!date) return "—";
 
-  return new Date(date).toLocaleString("en-IN", {
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+
+  return parsed.toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
   });
 };
 
-const statusLabel = (status) => {
-  switch (status) {
-    case "pending":
-      return "Pending";
-    case "issued":
-      return "Issued";
-    case "rejected":
-      return "Rejected";
-    default:
-      return status || "Unknown";
-  }
-};
-
 const certificateTypeLabel = (type) => {
   if (type === "CERT") return "Certificate";
   if (type === "INTR") return "Internship";
+
   return type || "—";
 };
 
-function CertificateRequests() {
+const statusLabel = (status) => {
+  if (status === "pending") return "Pending";
+  if (status === "issued") return "Issued";
+  if (status === "rejected") return "Rejected";
+
+  return status || "Unknown";
+};
+
+export default function CertificateRequests() {
   const navigate = useNavigate();
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(null);
   const [error, setError] = useState("");
 
   const [activeTab, setActiveTab] = useState("pending");
 
-  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequest, setSelectedRequest] =
+    useState(null);
 
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] =
+    useState(false);
 
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [showIssueModal, setShowIssueModal] =
+    useState(false);
 
-  const [issuerName, setIssuerName] = useState(
-    "eSparks IT Solutions"
-  );
+  const [rejectionReason, setRejectionReason] =
+    useState("");
 
-  const [issueDate, setIssueDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [actionLoading, setActionLoading] =
+    useState(false);
 
-  const [actionMessage, setActionMessage] = useState("");
+  const [actionMessage, setActionMessage] =
+    useState("");
 
-  /* ============================================================
-     LOAD CERTIFICATE REQUESTS
-  ============================================================ */
+  /* =========================================================
+     LOAD REQUESTS
+  ========================================================= */
 
   const loadRequests = async () => {
     try {
@@ -71,7 +73,11 @@ function CertificateRequests() {
         "/admin/certificate-requests"
       );
 
-      setRequests(data?.requests || []);
+      const list = Array.isArray(data?.requests)
+        ? data.requests
+        : [];
+
+      setRequests(list);
     } catch (error) {
       console.error(
         "Load certificate requests error:",
@@ -91,67 +97,88 @@ function CertificateRequests() {
     loadRequests();
   }, []);
 
-  /* ============================================================
-     FILTER REQUESTS
-  ============================================================ */
-
-  const filteredRequests = useMemo(() => {
-    return requests.filter(
-      (request) => request.status === activeTab
-    );
-  }, [requests, activeTab]);
-
-  /* ============================================================
+  /* =========================================================
      COUNTS
-  ============================================================ */
+  ========================================================= */
 
-  const counts = useMemo(() => {
-    return {
+  const counts = useMemo(
+    () => ({
       pending: requests.filter(
-        (request) => request.status === "pending"
+        (request) =>
+          request.status === "pending"
       ).length,
 
       issued: requests.filter(
-        (request) => request.status === "issued"
+        (request) =>
+          request.status === "issued"
       ).length,
 
       rejected: requests.filter(
-        (request) => request.status === "rejected"
+        (request) =>
+          request.status === "rejected"
       ).length,
-    };
-  }, [requests]);
+    }),
+    [requests]
+  );
 
-  /* ============================================================
-     REJECT MODAL
-  ============================================================ */
+  /* =========================================================
+     FILTER
+  ========================================================= */
+
+  const filteredRequests = useMemo(
+    () =>
+      requests.filter(
+        (request) =>
+          request.status === activeTab
+      ),
+    [requests, activeTab]
+  );
+
+  /* =========================================================
+     OPEN REJECT MODAL
+  ========================================================= */
 
   const openRejectModal = (request) => {
+    if (!request?.id) {
+      setError(
+        "Invalid certificate request."
+      );
+      return;
+    }
+
     setSelectedRequest(request);
     setRejectionReason("");
     setActionMessage("");
     setShowRejectModal(true);
   };
 
-  /* ============================================================
-     ISSUE MODAL
-  ============================================================ */
+  /* =========================================================
+     OPEN ISSUE MODAL
+  ========================================================= */
 
   const openIssueModal = (request) => {
-    setSelectedRequest(request);
-
-    setIssuerName("eSparks IT Solutions");
-
-    setIssueDate(
-      new Date().toISOString().split("T")[0]
+    const requestId = Number(
+      request?.id
     );
 
+    if (
+      !Number.isInteger(requestId) ||
+      requestId <= 0
+    ) {
+      setError(
+        "Invalid certificate request ID."
+      );
+      return;
+    }
+
+    setSelectedRequest(request);
     setActionMessage("");
     setShowIssueModal(true);
   };
 
-  /* ============================================================
+  /* =========================================================
      CLOSE MODALS
-  ============================================================ */
+  ========================================================= */
 
   const closeModals = () => {
     if (actionLoading) return;
@@ -163,39 +190,49 @@ function CertificateRequests() {
     setActionMessage("");
   };
 
-  /* ============================================================
+  /* =========================================================
      REJECT REQUEST
-  ============================================================ */
+  ========================================================= */
 
   const rejectRequest = async () => {
-    if (!selectedRequest) return;
-
-    const reason = rejectionReason.trim();
-
-    if (!reason) {
+    if (!selectedRequest) {
       setActionMessage(
-        "Please provide a rejection reason."
+        "No request selected."
       );
       return;
     }
 
-    if (reason.length > 2000) {
+    const requestId = Number(
+      selectedRequest.id
+    );
+
+    if (
+      !Number.isInteger(requestId) ||
+      requestId <= 0
+    ) {
       setActionMessage(
-        "Rejection reason cannot exceed 2000 characters."
+        "Invalid certificate request ID."
+      );
+      return;
+    }
+
+    const reason =
+      rejectionReason.trim();
+
+    if (!reason) {
+      setActionMessage(
+        "Please enter a rejection reason."
       );
       return;
     }
 
     try {
-      setActionLoading(
-        `reject-${selectedRequest.id}`
-      );
-
+      setActionLoading(true);
       setActionMessage("");
 
       await apiRequest(
         `/admin/certificate-requests/${encodeURIComponent(
-          selectedRequest.id
+          requestId
         )}/reject`,
         {
           method: "PATCH",
@@ -205,7 +242,9 @@ function CertificateRequests() {
         }
       );
 
-      closeModals();
+      setShowRejectModal(false);
+      setSelectedRequest(null);
+      setRejectionReason("");
 
       await loadRequests();
 
@@ -218,105 +257,117 @@ function CertificateRequests() {
 
       setActionMessage(
         error?.message ||
-          "Unable to reject certificate request."
+          "Unable to reject request."
       );
     } finally {
-      setActionLoading(null);
+      setActionLoading(false);
     }
   };
 
-  /* ============================================================
+  /* =========================================================
      CONTINUE TO CREATE CERTIFICATE
-     
-     IMPORTANT:
-     The certificate creation page requires:
-     
-     /admin/certificates/create?requestId=123
-     
-     Do NOT call the /issue endpoint here.
-     
-     AddCertificate.jsx will:
-     1. Read requestId
-     2. Load the verified request
-     3. Show employee/request information
-     4. Create the certificate securely
-  ============================================================ */
+  ========================================================= */
 
-  const continueToCreateCertificate = () => {
-    if (!selectedRequest) return;
-
-    const requestId = Number(selectedRequest.id);
-
-    if (
-      !Number.isInteger(requestId) ||
-      requestId <= 0
-    ) {
-      setActionMessage(
-        "Invalid certificate request ID."
+  const continueToCreateCertificate =
+    () => {
+      console.log(
+        "🟦 Continue clicked"
       );
-      return;
-    }
 
-    navigate(
-      `/admin/certificates/create?requestId=${encodeURIComponent(
+      console.log(
+        "🟦 Selected request:",
+        selectedRequest
+      );
+
+      if (!selectedRequest) {
+        setActionMessage(
+          "No certificate request is selected."
+        );
+        return;
+      }
+
+      const requestId = Number(
+        selectedRequest.id
+      );
+
+      console.log(
+        "🟦 Request ID:",
         requestId
-      )}`
-    );
-  };
+      );
 
-  /* ============================================================
+      if (
+        !Number.isInteger(requestId) ||
+        requestId <= 0
+      ) {
+        setActionMessage(
+          "Invalid certificate request ID."
+        );
+        return;
+      }
+
+      const url =
+        `/admin/certificates/create?requestId=${encodeURIComponent(
+          requestId
+        )}`;
+
+      console.log(
+        "🟢 Navigating:",
+        url
+      );
+
+      setShowIssueModal(false);
+
+      navigate(url);
+    };
+
+  /* =========================================================
      VIEW CERTIFICATE
-  ============================================================ */
+  ========================================================= */
 
-  const viewCertificate = (request) => {
-    if (!request?.certificate_id) {
-      return;
-    }
-
+  const viewCertificate = (
+    request
+  ) => {
     const certificateId = Number(
-      request.certificate_id
+      request?.certificate_id
     );
 
     if (
       !Number.isInteger(certificateId) ||
       certificateId <= 0
     ) {
+      console.error(
+        "Invalid certificate ID:",
+        request?.certificate_id
+      );
+
       return;
     }
-
-    /*
-      Correct route:
-
-      /admin/certificates/:id
-
-      NOT:
-
-      /admin/certificates/view/:id
-    */
 
     navigate(
       `/admin/certificates/${certificateId}`
     );
   };
 
-  /* ============================================================
-     UI
-  ============================================================ */
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   return (
     <div className="certificate-requests-page">
 
-      {/* =========================
-          HEADER
-      ========================= */}
+      {/* HEADER */}
 
       <div className="certificate-requests-header">
+
         <div>
-          <h1>Certificate Requests</h1>
+          <h1>
+            Certificate Requests
+          </h1>
 
           <p>
-            Review employee certificate requests and
-            issue or reject certificates.
+            Review employee certificate
+            requests and issue or reject
+            certificates.
           </p>
         </div>
 
@@ -330,11 +381,10 @@ function CertificateRequests() {
             ? "Refreshing..."
             : "Refresh"}
         </button>
+
       </div>
 
-      {/* =========================
-          ERROR
-      ========================= */}
+      {/* ERROR */}
 
       {error && (
         <div className="certificate-request-error">
@@ -342,9 +392,7 @@ function CertificateRequests() {
         </div>
       )}
 
-      {/* =========================
-          TABS
-      ========================= */}
+      {/* TABS */}
 
       <div className="certificate-request-tabs">
 
@@ -352,66 +400,76 @@ function CertificateRequests() {
           type="button"
           className={
             activeTab === "pending"
-              ? "request-tab active pending-tab"
+              ? "request-tab active"
               : "request-tab"
           }
           onClick={() =>
             setActiveTab("pending")
           }
         >
-          <span>Pending</span>
-          <strong>{counts.pending}</strong>
+          <span>
+            Pending
+          </span>
+
+          <strong>
+            {counts.pending}
+          </strong>
         </button>
 
         <button
           type="button"
           className={
             activeTab === "issued"
-              ? "request-tab active issued-tab"
+              ? "request-tab active"
               : "request-tab"
           }
           onClick={() =>
             setActiveTab("issued")
           }
         >
-          <span>Issued</span>
-          <strong>{counts.issued}</strong>
+          <span>
+            Issued
+          </span>
+
+          <strong>
+            {counts.issued}
+          </strong>
         </button>
 
         <button
           type="button"
           className={
             activeTab === "rejected"
-              ? "request-tab active rejected-tab"
+              ? "request-tab active"
               : "request-tab"
           }
           onClick={() =>
             setActiveTab("rejected")
           }
         >
-          <span>Rejected</span>
-          <strong>{counts.rejected}</strong>
+          <span>
+            Rejected
+          </span>
+
+          <strong>
+            {counts.rejected}
+          </strong>
         </button>
 
       </div>
 
-      {/* =========================
-          LOADING
-      ========================= */}
+      {/* LOADING */}
 
       {loading ? (
         <div className="certificate-request-loading">
-          <div className="certificate-spinner"></div>
+          <div className="certificate-spinner" />
 
           <p>
             Loading certificate requests...
           </p>
         </div>
-      ) : filteredRequests.length === 0 ? (
-
-        /* =========================
-           EMPTY
-        ========================= */
+      ) : filteredRequests.length ===
+        0 ? (
 
         <div className="certificate-request-empty">
 
@@ -425,279 +483,288 @@ function CertificateRequests() {
 
           <h2>
             No{" "}
-            {statusLabel(activeTab).toLowerCase()}{" "}
+            {statusLabel(
+              activeTab
+            ).toLowerCase()}{" "}
             requests
           </h2>
 
           <p>
-            There are currently no certificate
-            requests in this category.
+            There are currently no
+            certificate requests in this
+            category.
           </p>
 
         </div>
 
       ) : (
 
-        /* =========================
-           REQUEST LIST
-        ========================= */
-
         <div className="certificate-request-list">
 
           {filteredRequests.map(
-            (request) => (
-              <div
-                className="certificate-request-card"
-                key={request.id}
-              >
+            (request) => {
 
-                {/* =========================
-                    CARD TOP
-                ========================= */}
+              const requestId =
+                Number(request.id);
 
-                <div className="certificate-request-card-top">
+              const validRequestId =
+                Number.isInteger(
+                  requestId
+                ) &&
+                requestId > 0;
 
-                  <div>
+              return (
+                <div
+                  className="certificate-request-card"
+                  key={request.id}
+                >
+
+                  {/* TOP */}
+
+                  <div className="certificate-request-card-top">
+
                     <span
                       className={`request-status ${request.status}`}
                     >
-                      <span className="status-dot"></span>
+                      <span className="status-dot" />
 
                       {statusLabel(
                         request.status
                       )}
                     </span>
+
+                    <span className="request-id">
+                      Request #{request.id}
+                    </span>
+
                   </div>
 
-                  <span className="request-id">
-                    Request #{request.id}
-                  </span>
+                  {/* BODY */}
 
-                </div>
+                  <div className="certificate-request-body">
 
-                {/* =========================
-                    CARD BODY
-                ========================= */}
+                    {/* EMPLOYEE */}
 
-                <div className="certificate-request-body">
+                    <div className="employee-request-info">
 
-                  {/* EMPLOYEE */}
-
-                  <div className="employee-request-info">
-
-                    <div className="employee-avatar">
-                      {String(
-                        request.employee_name ||
+                      <div className="employee-avatar">
+                        {(
+                          request.employee_name ||
                           request.employeeName ||
                           "E"
-                      )
-                        .charAt(0)
-                        .toUpperCase()}
+                        )
+                          .charAt(0)
+                          .toUpperCase()}
+                      </div>
+
+                      <div>
+                        <h2>
+                          {request.employee_name ||
+                            request.employeeName ||
+                            "Unknown Employee"}
+                        </h2>
+
+                        <p>
+                          {request.employee_email ||
+                            request.employeeEmail ||
+                            "No email available"}
+                        </p>
+                      </div>
+
                     </div>
 
-                    <div>
+                    {/* DETAILS */}
 
-                      <h2>
-                        {request.employee_name ||
-                          request.employeeName ||
-                          "Unknown Employee"}
-                      </h2>
+                    <div className="request-details-grid">
+
+                      <div className="request-detail">
+                        <span>
+                          Certificate Type
+                        </span>
+
+                        <strong>
+                          {certificateTypeLabel(
+                            request.certificate_type
+                          )}
+                        </strong>
+                      </div>
+
+                      <div className="request-detail">
+                        <span>
+                          Course / Program
+                        </span>
+
+                        <strong>
+                          {request.course_name ||
+                            "—"}
+                        </strong>
+                      </div>
+
+                      <div className="request-detail">
+                        <span>
+                          Requested On
+                        </span>
+
+                        <strong>
+                          {formatDate(
+                            request.created_at
+                          )}
+                        </strong>
+                      </div>
+
+                      {request.duration_months && (
+                        <div className="request-detail">
+                          <span>
+                            Duration
+                          </span>
+
+                          <strong>
+                            {
+                              request.duration_months
+                            }{" "}
+                            months
+                          </strong>
+                        </div>
+                      )}
+
+                      {request.certificate_no && (
+                        <div className="request-detail">
+                          <span>
+                            Certificate No.
+                          </span>
+
+                          <strong>
+                            {
+                              request.certificate_no
+                            }
+                          </strong>
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* DETAILS */}
+
+                    <div className="request-additional-details">
+
+                      <span>
+                        Additional Details
+                      </span>
 
                       <p>
-                        {request.employee_email ||
-                          request.employeeEmail ||
-                          "No email available"}
+                        {request.additional_details ||
+                          "No additional details provided."}
                       </p>
 
                     </div>
 
-                  </div>
+                    {/* REJECTION */}
 
-                  {/* REQUEST DETAILS */}
-
-                  <div className="request-details-grid">
-
-                    <div className="request-detail">
-                      <span>
-                        Certificate Type
-                      </span>
-
-                      <strong>
-                        {certificateTypeLabel(
-                          request.certificate_type
-                        )}
-                      </strong>
-
-                      <small>
-                        {request.certificate_type}
-                      </small>
-                    </div>
-
-                    <div className="request-detail">
-                      <span>
-                        Course / Program
-                      </span>
-
-                      <strong>
-                        {request.course_name ||
-                          "—"}
-                      </strong>
-                    </div>
-
-                    <div className="request-detail">
-                      <span>
-                        Requested On
-                      </span>
-
-                      <strong>
-                        {formatDate(
-                          request.created_at
-                        )}
-                      </strong>
-                    </div>
-
-                    {request.certificate_no && (
-                      <div className="request-detail">
+                    {request.rejection_reason && (
+                      <div className="rejection-reason-box">
 
                         <span>
-                          Certificate No.
+                          Rejection Reason
                         </span>
 
-                        <strong className="certificate-number">
+                        <p>
                           {
-                            request.certificate_no
+                            request.rejection_reason
                           }
-                        </strong>
+                        </p>
 
                       </div>
                     )}
 
                   </div>
 
-                  {/* ADDITIONAL DETAILS */}
+                  {/* FOOTER */}
 
-                  <div className="request-additional-details">
+                  <div className="certificate-request-card-footer">
 
-                    <span>
-                      Additional Details
-                    </span>
+                    {request.status ===
+                      "pending" && (
+                      <>
 
-                    <p>
-                      {request.additional_details ||
-                        "No additional details provided."}
-                    </p>
+                        <button
+                          type="button"
+                          className="reject-request-btn"
+                          onClick={() =>
+                            openRejectModal(
+                              request
+                            )
+                          }
+                          disabled={
+                            actionLoading
+                          }
+                        >
+                          Reject Request
+                        </button>
+
+                        <button
+                          type="button"
+                          className="issue-request-btn"
+                          onClick={() =>
+                            openIssueModal(
+                              request
+                            )
+                          }
+                          disabled={
+                            !validRequestId ||
+                            actionLoading
+                          }
+                        >
+                          Issue Certificate
+                        </button>
+
+                      </>
+                    )}
+
+                    {request.status ===
+                      "rejected" && (
+                      <div className="request-final-status rejected-final">
+                        <span>✕</span>
+                        Request Rejected
+                      </div>
+                    )}
+
+                    {request.status ===
+                      "issued" && (
+                      <>
+
+                        <div className="request-final-status issued-final">
+                          <span>✓</span>
+                          Certificate Issued
+                        </div>
+
+                        <button
+                          type="button"
+                          className="view-certificate-btn"
+                          onClick={() =>
+                            viewCertificate(
+                              request
+                            )
+                          }
+                        >
+                          View Certificate
+                        </button>
+
+                      </>
+                    )}
 
                   </div>
 
-                  {/* REJECTION REASON */}
-
-                  {request.rejection_reason && (
-                    <div className="rejection-reason-box">
-
-                      <span>
-                        Rejection Reason
-                      </span>
-
-                      <p>
-                        {request.rejection_reason}
-                      </p>
-
-                    </div>
-                  )}
-
                 </div>
-
-                {/* =========================
-                    CARD FOOTER
-                ========================= */}
-
-                <div className="certificate-request-card-footer">
-
-                  {/* PENDING */}
-
-                  {request.status ===
-                    "pending" && (
-                    <>
-                      <button
-                        type="button"
-                        className="reject-request-btn"
-                        onClick={() =>
-                          openRejectModal(
-                            request
-                          )
-                        }
-                        disabled={
-                          actionLoading ===
-                          `reject-${request.id}`
-                        }
-                      >
-                        Reject Request
-                      </button>
-
-                      <button
-                        type="button"
-                        className="issue-request-btn"
-                        onClick={() =>
-                          openIssueModal(
-                            request
-                          )
-                        }
-                        disabled={
-                          actionLoading ===
-                          `issue-${request.id}`
-                        }
-                      >
-                        Issue Certificate
-                      </button>
-                    </>
-                  )}
-
-                  {/* REJECTED */}
-
-                  {request.status ===
-                    "rejected" && (
-                    <div className="request-final-status rejected-final">
-                      <span>✕</span>
-                      Request Rejected
-                    </div>
-                  )}
-
-                  {/* ISSUED */}
-
-                  {request.status ===
-                    "issued" && (
-                    <>
-                      <div className="request-final-status issued-final">
-                        <span>✓</span>
-                        Certificate Issued
-                      </div>
-
-                      <button
-                        type="button"
-                        className="view-certificate-btn"
-                        onClick={() =>
-                          viewCertificate(
-                            request
-                          )
-                        }
-                      >
-                        View Certificate
-                      </button>
-                    </>
-                  )}
-
-                </div>
-
-              </div>
-            )
+              );
+            }
           )}
 
         </div>
       )}
 
-      {/* ============================================================
+      {/* =====================================================
           REJECT MODAL
-      ============================================================ */}
+      ===================================================== */}
 
       {showRejectModal &&
         selectedRequest && (
@@ -719,31 +786,21 @@ function CertificateRequests() {
               <div className="certificate-modal-header">
 
                 <div>
+                  <h2>
+                    Reject Certificate Request
+                  </h2>
 
-                  <span className="modal-danger-icon">
-                    !
-                  </span>
-
-                  <div>
-
-                    <h2>
-                      Reject Certificate Request
-                    </h2>
-
-                    <p>
-                      This request will be
-                      marked as rejected.
-                    </p>
-
-                  </div>
-
+                  <p>
+                    Request #
+                    {selectedRequest.id}
+                  </p>
                 </div>
 
                 <button
                   type="button"
                   className="modal-close-btn"
                   onClick={closeModals}
-                  disabled={!!actionLoading}
+                  disabled={actionLoading}
                 >
                   ×
                 </button>
@@ -751,19 +808,6 @@ function CertificateRequests() {
               </div>
 
               <div className="certificate-modal-content">
-
-                <div className="modal-request-summary">
-
-                  <strong>
-                    {selectedRequest.employee_name ||
-                      selectedRequest.employeeName}
-                  </strong>
-
-                  <span>
-                    {selectedRequest.course_name}
-                  </span>
-
-                </div>
 
                 <label htmlFor="rejectionReason">
                   Rejection Reason
@@ -778,12 +822,15 @@ function CertificateRequests() {
                     )
                   }
                   placeholder="Enter the reason for rejecting this request..."
-                  rows="5"
-                  maxLength="2000"
+                  rows={5}
+                  maxLength={2000}
                 />
 
                 <div className="textarea-counter">
-                  {rejectionReason.length}/2000
+                  {
+                    rejectionReason.length
+                  }
+                  /2000
                 </div>
 
                 {actionMessage && (
@@ -800,7 +847,7 @@ function CertificateRequests() {
                   type="button"
                   className="modal-cancel-btn"
                   onClick={closeModals}
-                  disabled={!!actionLoading}
+                  disabled={actionLoading}
                 >
                   Cancel
                 </button>
@@ -809,10 +856,9 @@ function CertificateRequests() {
                   type="button"
                   className="modal-reject-btn"
                   onClick={rejectRequest}
-                  disabled={!!actionLoading}
+                  disabled={actionLoading}
                 >
-                  {actionLoading ===
-                  `reject-${selectedRequest.id}`
+                  {actionLoading
                     ? "Rejecting..."
                     : "Reject Request"}
                 </button>
@@ -824,9 +870,9 @@ function CertificateRequests() {
           </div>
         )}
 
-      {/* ============================================================
-          ISSUE / CREATE CERTIFICATE MODAL
-      ============================================================ */}
+      {/* =====================================================
+          ISSUE MODAL
+      ===================================================== */}
 
       {showIssueModal &&
         selectedRequest && (
@@ -848,31 +894,20 @@ function CertificateRequests() {
               <div className="certificate-modal-header">
 
                 <div>
+                  <h2>
+                    Create Certificate
+                  </h2>
 
-                  <span className="modal-success-icon">
-                    ✓
-                  </span>
-
-                  <div>
-
-                    <h2>
-                      Create Certificate
-                    </h2>
-
-                    <p>
-                      Review the request before
-                      continuing to certificate creation.
-                    </p>
-
-                  </div>
-
+                  <p>
+                    Request #
+                    {selectedRequest.id}
+                  </p>
                 </div>
 
                 <button
                   type="button"
                   className="modal-close-btn"
                   onClick={closeModals}
-                  disabled={!!actionLoading}
                 >
                   ×
                 </button>
@@ -885,22 +920,13 @@ function CertificateRequests() {
 
                   <div>
                     <span>
-                      Request ID
-                    </span>
-
-                    <strong>
-                      #{selectedRequest.id}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
                       Employee
                     </span>
 
                     <strong>
                       {selectedRequest.employee_name ||
-                        selectedRequest.employeeName}
+                        selectedRequest.employeeName ||
+                        "Unknown Employee"}
                     </strong>
                   </div>
 
@@ -911,7 +937,8 @@ function CertificateRequests() {
 
                     <strong>
                       {selectedRequest.employee_email ||
-                        selectedRequest.employeeEmail}
+                        selectedRequest.employeeEmail ||
+                        "—"}
                     </strong>
                   </div>
 
@@ -933,22 +960,37 @@ function CertificateRequests() {
                     </span>
 
                     <strong>
-                      {selectedRequest.course_name}
+                      {selectedRequest.course_name ||
+                        "—"}
                     </strong>
                   </div>
+
+                  {selectedRequest.duration_months && (
+                    <div>
+                      <span>
+                        Duration
+                      </span>
+
+                      <strong>
+                        {
+                          selectedRequest.duration_months
+                        }{" "}
+                        months
+                      </strong>
+                    </div>
+                  )}
 
                 </div>
 
                 <div className="issue-warning">
-                  <span>ⓘ</span>
 
                   <p>
-                    The certificate creation page will
-                    load the verified employee information
-                    from this request. Certificate number,
-                    employee ID and verification token are
-                    generated/handled securely by the server.
+                    Continue to the certificate
+                    creation page. Employee
+                    information will be loaded
+                    from this verified request.
                   </p>
+
                 </div>
 
                 {actionMessage && (
@@ -965,7 +1007,6 @@ function CertificateRequests() {
                   type="button"
                   className="modal-cancel-btn"
                   onClick={closeModals}
-                  disabled={!!actionLoading}
                 >
                   Cancel
                 </button>
@@ -976,7 +1017,6 @@ function CertificateRequests() {
                   onClick={
                     continueToCreateCertificate
                   }
-                  disabled={!!actionLoading}
                 >
                   Continue to Create Certificate
                 </button>
@@ -991,5 +1031,3 @@ function CertificateRequests() {
     </div>
   );
 }
-
-export default CertificateRequests;

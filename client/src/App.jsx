@@ -33,6 +33,10 @@ import AddCertificate from "./Admin/Certificates/AddCertificate";
 import ManageCertificate from "./Admin/Certificates/ManageCertificates";
 import AdminViewCertificate from "./Admin/Certificates/ViewCertificate";
 import EditCertificate from "./Admin/Certificates/EditCertificate";
+
+// =========================
+// ADMIN CERTIFICATE REQUESTS
+// =========================
 import AdminCertificateRequest from "./Admin/AdminCertificateRequest";
 
 // =========================
@@ -86,9 +90,9 @@ function App() {
   return (
     <Routes>
 
-      {/* =====================================
+      {/* =====================================================
           PUBLIC ROUTES
-      ====================================== */}
+      ===================================================== */}
 
       <Route
         path="/"
@@ -106,12 +110,13 @@ function App() {
       />
 
       <Route
-        path="/certificate/request"
-        element={
-          <ProtectedRoute>
-            <CertificateRequest />
-          </ProtectedRoute>
-        }
+        path="/forgot-password"
+        element={<ForgotPassword />}
+      />
+
+      <Route
+        path="/reset-password"
+        element={<ResetPassword />}
       />
 
       <Route
@@ -124,9 +129,18 @@ function App() {
         element={<CertificateView />}
       />
 
-      {/* =====================================
-          EMPLOYEE PROTECTED ROUTE
-      ====================================== */}
+      <Route
+        path="/certificate/request"
+        element={
+          <ProtectedRoute>
+            <CertificateRequest />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
+          EMPLOYEE DASHBOARD
+      ===================================================== */}
 
       <Route
         path="/dashboard"
@@ -137,28 +151,18 @@ function App() {
         }
       />
 
-      {/* =====================================
+      {/* =====================================================
           ADMIN LOGIN
-      ====================================== */}
+      ===================================================== */}
 
       <Route
         path="/admin/login"
         element={<AdminLogin />}
       />
 
-      <Route
-  path="/forgot-password"
-  element={<ForgotPassword />}
-/>
-
-<Route
-  path="/reset-password"
-  element={<ResetPassword />}
-/>
-
-      {/* =====================================
+      {/* =====================================================
           ADMIN DASHBOARD
-      ====================================== */}
+      ===================================================== */}
 
       <Route
         path="/admin"
@@ -169,9 +173,9 @@ function App() {
         }
       />
 
-      {/* =====================================
-          ADMIN EMPLOYEE MANAGEMENT
-      ====================================== */}
+      {/* =====================================================
+          ADMIN EMPLOYEES
+      ===================================================== */}
 
       <Route
         path="/admin/employees"
@@ -191,22 +195,9 @@ function App() {
         }
       />
 
-      {/* =====================================
-          ADMIN CERTIFICATE MANAGEMENT
-      ====================================== */}
-
-      <Route
-        path="/admin/certificates"
-        element={
-          <AdminProtectedRoute>
-            <ManageCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================
+      {/* =====================================================
           ADMIN CERTIFICATE REQUESTS
-      ====================================== */}
+      ===================================================== */}
 
       <Route
         path="/admin/certificate-requests"
@@ -217,11 +208,27 @@ function App() {
         }
       />
 
-      {/* =====================================
+      {/* =====================================================
+          ADMIN CERTIFICATES
+      ===================================================== */}
+
+      <Route
+        path="/admin/certificates"
+        element={
+          <AdminProtectedRoute>
+            <ManageCertificate />
+          </AdminProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
           CREATE CERTIFICATE
-          Example:
-          /admin/certificates/create?requestId=6
-      ====================================== */}
+          
+          IMPORTANT:
+          This route expects:
+          
+          /admin/certificates/create?requestId=14
+      ===================================================== */}
 
       <Route
         path="/admin/certificates/create"
@@ -232,29 +239,12 @@ function App() {
         }
       />
 
-      {/* =====================================
-          VIEW CERTIFICATE
-          Example:
-          /admin/certificates/10
-
-          ViewCertificate.jsx:
-          const { id } = useParams();
-      ====================================== */}
-
-      <Route
-        path="/admin/certificates/:id"
-        element={
-          <AdminProtectedRoute>
-            <AdminViewCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================
+      {/* =====================================================
           EDIT CERTIFICATE
+
           Example:
-          /admin/certificates/10/edit
-      ====================================== */}
+          /admin/certificates/14/edit
+      ===================================================== */}
 
       <Route
         path="/admin/certificates/:id/edit"
@@ -265,9 +255,25 @@ function App() {
         }
       />
 
-      {/* =====================================
+      {/* =====================================================
+          VIEW CERTIFICATE
+
+          Example:
+          /admin/certificates/14
+      ===================================================== */}
+
+      <Route
+        path="/admin/certificates/:id"
+        element={
+          <AdminProtectedRoute>
+            <AdminViewCertificate />
+          </AdminProtectedRoute>
+        }
+      />
+
+      {/* =====================================================
           404
-      ====================================== */}
+      ===================================================== */}
 
       <Route
         path="*"
