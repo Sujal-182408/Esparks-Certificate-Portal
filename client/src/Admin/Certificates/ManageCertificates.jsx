@@ -257,7 +257,7 @@ export default function ManageCertificates() {
             className="add-certificate-btn"
             onClick={() =>
               navigate(
-                "/admin/certificates/create"
+               "/admin/certificate-requests"
               )
             }
           >
@@ -367,7 +367,7 @@ export default function ManageCertificates() {
                 className="empty-create-btn"
                 onClick={() =>
                   navigate(
-                    "/admin/certificates/create"
+                 "/admin/certificate-requests"
                   )
                 }
               >

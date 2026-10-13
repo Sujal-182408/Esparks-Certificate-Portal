@@ -639,7 +639,7 @@ export default function AdminDashboard() {
             <div className="admin-hero-actions">
 
               <Link
-                to="/admin/certificates/create"
+                to="/admin/certificate-requests"
                 className="admin-primary-button"
               >
                 <FilePlus2 size={18} />
@@ -880,7 +880,7 @@ export default function AdminDashboard() {
             {/* ISSUE CERTIFICATE */}
 
             <Link
-              to="/admin/certificates/create"
+           to="/admin/certificate-requests"
               className="workspace-card workspace-blue"
             >
 
