@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-
-const API_URL = "/api";
+import { getCurrentAdmin } from "../services/api";
 
 export default function AdminProtectedRoute({
   children,
@@ -17,23 +16,10 @@ export default function AdminProtectedRoute({
 
     async function checkAuth() {
       try {
-        const response = await fetch(
-          `${API_URL}/auth/me`,
-          {
-            method: "GET",
-            credentials: "include",
-            headers: {
-              Accept: "application/json",
-            },
-          }
-        );
-
-        const data =
-          await response.json().catch(() => ({}));
+        const data = await getCurrentAdmin();
 
         console.log(
           "🔐 AdminProtectedRoute /me:",
-          response.status,
           data
         );
 
@@ -42,7 +28,6 @@ export default function AdminProtectedRoute({
         }
 
         if (
-          response.ok &&
           data?.admin?.role === "admin" &&
           data?.admin?.is_active === true
         ) {
