@@ -414,7 +414,7 @@ export default function QRScanner({ onScan }) {
         <input
           id="qr-upload-input"
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp"
+          accept="image/png,image/jpeg,image/jpg,image/png"
           onChange={handleQRUpload}
           hidden
         />
@@ -428,7 +428,7 @@ export default function QRScanner({ onScan }) {
           <div>
             <strong>Upload QR Image</strong>
             <small>
-              PNG, JPG or WEBP
+              PNG, JPG or png
             </small>
           </div>
         </label>
