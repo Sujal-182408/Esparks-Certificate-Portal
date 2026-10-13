@@ -130,6 +130,15 @@ export function getAdminCertificates() {
   return apiRequest("/admin/certificates");
 }
 
+export function revokeAdminCertificate(id) {
+  return apiRequest(
+    `/admin/certificates/${encodeURIComponent(id)}/revoke`,
+    {
+      method: "PATCH",
+    }
+  );
+}
+
 /* =========================================================
    ADMIN CERTIFICATE REQUESTS
 ========================================================= */
