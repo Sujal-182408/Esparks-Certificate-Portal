@@ -76,13 +76,29 @@ const CLIENT_URL =
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "https://esparks-certificate-portal.vercel.app",
+];
 
-  "http://192.168.1.5:5173",
-  "http://192.168.1.5:5174",
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests without Origin
+      // such as Postman/server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
 
-  CLIENT_URL,
-].filter(Boolean);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
 
+      return callback(
+        new Error(`CORS blocked origin: ${origin}`)
+      );
+    },
+    credentials: true,
+  })
+);
 const uniqueAllowedOrigins = [
   ...new Set(allowedOrigins),
 ];
