@@ -2,17 +2,17 @@
   "name": "certificate-api",
   "version": "1.0.0",
   "description": "Certificate verification API",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
   "engines": {
-  "node": "22.x"
-},
+    "node": "22.x"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -1,17 +1,16 @@
 
-const readline = require("node:readline/promises");
-const { stdin, stdout } = require("node:process");
-const bcrypt = require("bcrypt");
-const pool = require("./db");
+import readline from "node:readline/promises";
+import { stdin, stdout } from "node:process";
+import bcrypt from "bcrypt";
+import pool from "./db.js";
 
 async function main() {
   const rl = readline.createInterface({ input: stdin, output: stdout });
 
   try {
-    const email = (
-      await rl.question("Enter admin email: ")
-    ).trim().toLowerCase();
-
+    const email = (await rl.question("Enter admin email: "))
+      .trim()
+      .toLowerCase();
     const password = await rl.question(
       "Enter admin password (minimum 12 characters): "
     );
@@ -20,14 +19,13 @@ async function main() {
       throw new Error("Please enter a valid email address.");
     }
 
-    if (password.length < 12 || password.length > 72) {
+    if (password.length < 12 || Buffer.byteLength(password, "utf8") > 72) {
       throw new Error(
-        "Password must contain 12–72 characters for this setup."
+        "Password must contain at least 12 characters and no more than 72 UTF-8 bytes for this setup."
       );
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-
     const result = await pool.query(
       `INSERT INTO admin_users (email, password_hash)
        VALUES ($1, $2)

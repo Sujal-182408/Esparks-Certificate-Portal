@@ -1,292 +1,84 @@
 // ============================================================
 // SOCKET.IO CONFIGURATION
 // ============================================================
+// One Socket.IO instance is attached to the HTTP server from server.js.
+// Notification events are emitted after their PostgreSQL transaction commits.
 
-/**
- * This file contains all real-time communication logic.
- *
- * Socket.IO is responsible for:
- *
- * Employee  → Admin
- * Admin     → Employee
- *
- * instant notifications.
- */
-
-// ------------------------------------------------------------
-// Socket.IO Server
-// ------------------------------------------------------------
+import { Server } from "socket.io";
 
 let io = null;
 
-
-// ============================================================
-// INITIALIZE SOCKET.IO
-// ============================================================
-
-/**
- * Initializes Socket.IO with the HTTP server.
- *
- * server = Node HTTP server created in server.js
- */
 function initializeSocket(server, allowedOrigins = []) {
-  const { Server } = require("socket.io");
+  if (io) {
+    throw new Error("Socket.IO has already been initialized.");
+  }
 
   io = new Server(server, {
     cors: {
       origin: allowedOrigins,
-
       credentials: true,
-
-      methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "PATCH",
-        "DELETE",
-      ],
+      methods: ["GET", "POST"],
     },
+    maxHttpBufferSize: 10000,
   });
-
-
-  // ----------------------------------------------------------
-  // New socket connection
-  // ----------------------------------------------------------
 
   io.on("connection", (socket) => {
-    console.log(
-      `🔌 Socket connected: ${socket.id}`
-    );
+    console.log(`🔌 Socket connected: ${socket.id}`);
 
-
-    // ========================================================
-    // EMPLOYEE ROOM
-    // ========================================================
-
-    /**
-     * Employee joins:
-     *
-     * employee:5
-     *
-     * If employee ID is 5.
-     */
-    socket.on(
-      "join:employee",
-      (employeeId) => {
-        const id =
-          Number(employeeId);
-
-        // Validate employee ID
-        if (
-          !Number.isInteger(id) ||
-          id <= 0
-        ) {
-          console.warn(
-            "Invalid employee socket ID."
-          );
-
-          return;
-        }
-
-
-        // Create private employee room
-        const room =
-          `employee:${id}`;
-
-
-        // Join room
-        socket.join(room);
-
-
-        console.log(
-          `👤 Employee ${id} joined ${room}`
-        );
+    // IMPORTANT: these room-join events only validate the ID format. They do
+    // not authenticate the caller. Add socket JWT/session verification and
+    // compare the requested ID with the verified identity before production use.
+    socket.on("join:employee", (employeeId) => {
+      const id = Number(employeeId);
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        socket.emit("notification:error", { message: "Invalid employee ID." });
+        return;
       }
-    );
+      const room = `employee:${id}`;
+      socket.join(room);
+      console.log(`👤 Employee room requested: ${room}`);
+    });
 
-
-    // ========================================================
-    // ADMIN ROOM
-    // ========================================================
-
-    /**
-     * Admin joins:
-     *
-     * admin:1
-     *
-     * If admin ID is 1.
-     */
-    socket.on(
-      "join:admin",
-      (adminId) => {
-        const id =
-          Number(adminId);
-
-        // Validate admin ID
-        if (
-          !Number.isInteger(id) ||
-          id <= 0
-        ) {
-          console.warn(
-            "Invalid admin socket ID."
-          );
-
-          return;
-        }
-
-
-        // Create admin room
-        const room =
-          `admin:${id}`;
-
-
-        // Join room
-        socket.join(room);
-
-
-        console.log(
-          `👨‍💼 Admin ${id} joined ${room}`
-        );
+    socket.on("join:admin", (adminId) => {
+      const id = Number(adminId);
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        socket.emit("notification:error", { message: "Invalid admin ID." });
+        return;
       }
-    );
+      const room = `admin:${id}`;
+      socket.join(room);
+      console.log(`👨‍💼 Admin room requested: ${room}`);
+    });
 
-
-    // ========================================================
-    // DISCONNECT
-    // ========================================================
-
-    /**
-     * Runs when browser closes,
-     * internet disconnects,
-     * page reloads, etc.
-     */
-    socket.on(
-      "disconnect",
-      (reason) => {
-        console.log(
-          `🔌 Socket disconnected: ${socket.id}`
-        );
-
-        console.log(
-          `Reason: ${reason}`
-        );
-      }
-    );
+    socket.on("disconnect", (reason) => {
+      console.log(`🔌 Socket disconnected: ${socket.id} - ${reason}`);
+    });
   });
 
-
-  console.log(
-    "🔌 Socket.IO initialized successfully."
-  );
-
-
+  console.log("🔌 Socket.IO initialized successfully.");
   return io;
 }
 
-
-// ============================================================
-// GET SOCKET.IO INSTANCE
-// ============================================================
-
-/**
- * Returns the initialized Socket.IO instance.
- *
- * Other backend files can use this to emit events.
- */
 function getIO() {
   if (!io) {
-    throw new Error(
-      "Socket.IO has not been initialized."
-    );
+    throw new Error("Socket.IO has not been initialized.");
   }
-
   return io;
 }
 
-
-// ============================================================
-// SEND EMPLOYEE NOTIFICATION
-// ============================================================
-
-/**
- * Sends a real-time notification to one employee.
- *
- * Example:
- *
- * employeeId = 5
- *
- * Notification goes to:
- *
- * employee:5
- */
-function emitEmployeeNotification(
-  employeeId,
-  notification
-) {
-  const id =
-    Number(employeeId);
-
-  if (
-    !Number.isInteger(id) ||
-    id <= 0
-  ) {
-    return;
-  }
-
-
-  getIO()
-    .to(`employee:${id}`)
-    .emit(
-      "notification:new",
-      notification
-    );
+function emitEmployeeNotification(employeeId, notification) {
+  const id = Number(employeeId);
+  if (!Number.isSafeInteger(id) || id <= 0 || !notification) return;
+  getIO().to(`employee:${id}`).emit("notification:new", notification);
 }
 
-
-// ============================================================
-// SEND ADMIN NOTIFICATION
-// ============================================================
-
-/**
- * Sends a real-time notification to one admin.
- *
- * Example:
- *
- * adminId = 1
- *
- * Notification goes to:
- *
- * admin:1
- */
-function emitAdminNotification(
-  adminId,
-  notification
-) {
-  const id =
-    Number(adminId);
-
-  if (
-    !Number.isInteger(id) ||
-    id <= 0
-  ) {
-    return;
-  }
-
-
-  getIO()
-    .to(`admin:${id}`)
-    .emit(
-      "notification:new",
-      notification
-    );
+function emitAdminNotification(adminId, notification) {
+  const id = Number(adminId);
+  if (!Number.isSafeInteger(id) || id <= 0 || !notification) return;
+  getIO().to(`admin:${id}`).emit("notification:new", notification);
 }
 
-
-// ============================================================
-// EXPORT FUNCTIONS
-// ============================================================
-
-module.exports = {
+export {
   initializeSocket,
   getIO,
   emitEmployeeNotification,

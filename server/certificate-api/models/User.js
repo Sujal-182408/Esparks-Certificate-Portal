@@ -1,46 +1,40 @@
+import pool from "../db.js";
 
-const mongoose = require("mongoose");
+const User = {
+  async create({ name, email, employeeId, password, role = "employee" }) {
+    const result = await pool.query(
+      `INSERT INTO users (name, email, employee_id, password, role)
+       VALUES ($1, LOWER($2), $3, $4, $5)
+       RETURNING id, name, email, employee_id, role, created_at, updated_at`,
+      [name.trim(), email.trim(), employeeId.trim(), password, role]
+    );
 
-const userSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      minlength: 2,
-      maxlength: 100,
-    },
-
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-      maxlength: 254,
-    },
-
-    employeeId: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      maxlength: 50,
-    },
-
-    password: {
-      type: String,
-      required: true,
-      select: false,
-    },
-
-    role: {
-      type: String,
-      enum: ["employee", "verifier", "admin"],
-      default: "employee",
-    },
+    return result.rows[0];
   },
-  { timestamps: true }
-);
 
-module.exports = mongoose.model("User", userSchema);
+  async findByEmail(email) {
+    const result = await pool.query(
+      `SELECT id, name, email, employee_id, password, role, created_at, updated_at
+       FROM users
+       WHERE email = LOWER($1)
+       LIMIT 1`,
+      [email.trim()]
+    );
+
+    return result.rows[0] || null;
+  },
+
+  async findById(id) {
+    const result = await pool.query(
+      `SELECT id, name, email, employee_id, role, created_at, updated_at
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [id]
+    );
+
+    return result.rows[0] || null;
+  }
+};
+
+export default User;

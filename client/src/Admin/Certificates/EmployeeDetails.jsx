@@ -18,7 +18,7 @@ import {
 
 import "./EmployeeDetails.css";
 
-const API_URL = "/api";
+import { apiRequest } from "../../services/api";
 
 export default function EmployeeDetails() {
   const { id } = useParams();
@@ -29,65 +29,42 @@ export default function EmployeeDetails() {
   const [error, setError] = useState("");
 
   async function loadEmployee() {
-    if (!id) {
-      setError("Employee ID is missing.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await fetch(
-        `${API_URL}/admin/employees/${encodeURIComponent(id)}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      if (response.status === 401) {
-        navigate("/admin/login", { replace: true });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            `Unable to load employee details. (${response.status})`
-        );
-      }
-
-      if (!data?.success && !data?.employee) {
-        throw new Error(
-          data?.message || "Employee details could not be loaded."
-        );
-      }
-
-      setEmployee(data.employee || data);
-    } catch (err) {
-      console.error("Employee details error:", err);
-
-      setError(
-        err?.message ||
-          "Something went wrong while loading employee details."
-      );
-    } finally {
-      setLoading(false);
-    }
+  if (!id) {
+    setError("Employee ID is missing.");
+    setLoading(false);
+    return;
   }
+
+  try {
+    setLoading(true);
+    setError("");
+
+    const data = await apiRequest(
+      `/admin/employees/${encodeURIComponent(id)}`,
+      { method: "GET" }
+    );
+
+    if (!data?.success || !data?.employee) {
+      throw new Error(
+        data?.message || "Employee details could not be loaded."
+      );
+    }
+
+    setEmployee({
+      ...data.employee,
+      certificates: Array.isArray(data.certificates)
+        ? data.certificates
+        : [],
+    });
+  } catch (err) {
+    console.error("Employee details error:", err);
+    setError(
+      err?.message || "Something went wrong while loading employee details."
+    );
+  } finally {
+    setLoading(false);
+  }
+}
 
   useEffect(() => {
     loadEmployee();

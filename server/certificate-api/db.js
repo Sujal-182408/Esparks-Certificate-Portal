@@ -1,4 +1,5 @@
-const { Pool } = require("@neondatabase/serverless");
+
+import { Pool } from "@neondatabase/serverless";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is missing.");
@@ -12,10 +13,7 @@ const pool = new Pool({
 });
 
 pool.on("error", (error) => {
-  console.error(
-    "Unexpected PostgreSQL pool error:",
-    error.message
-  );
+  console.error("Unexpected PostgreSQL pool error:", error.message);
 });
 
-module.exports = pool;
+export default pool;

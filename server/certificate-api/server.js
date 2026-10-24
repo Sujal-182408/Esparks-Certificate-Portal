@@ -1,64 +1,57 @@
 // ============================================================
 // ESPARKS IT SOLUTIONS CERTIFICATE MANAGEMENT SYSTEM
-// Backend API Server
+// Backend API Server - ES Modules
 // Express + PostgreSQL + Socket.IO
 // ============================================================
 
-// ============================================================
-// 1. IMPORT REQUIRED PACKAGES
-// ============================================================
+import path from "node:path";
+import http from "node:http";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 
-const path = require("path");
-const http = require("http");
+// ESM equivalent of __dirname.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const dotenv = require("dotenv");
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const cookieParser = require("cookie-parser");
-const rateLimit = require("express-rate-limit");
-const { Server } = require("socket.io");
+// Load .env before importing local modules that initialize the database
+// or read environment variables at module scope.
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
-// ============================================================
-// 2. LOAD ENVIRONMENT VARIABLES
-// ============================================================
-
-dotenv.config({
-  path: path.resolve(__dirname, ".env"),
-});
-
-// ============================================================
-// 3. IMPORT DATABASE
-// ============================================================
-
-const pool = require("./db");
-
-// ============================================================
-// 4. IMPORT AUTHENTICATION ROUTES / MIDDLEWARE
-// ============================================================
-
-const {
-  router: authRouter,
-  requireAdmin,
-} = require("./routes/auth");
+// Dynamic imports ensure dotenv has run before db.js and route modules load.
+const [
+  { default: pool },
+  socketModule,
+  authModule,
+  employeeAuthModule,
+  notificationModule,
+] = await Promise.all([
+  import("./db.js"),
+  import("./socket.js"),
+  import("./routes/auth.js"),
+  import("./routes/employeeAuth.js"),
+  import("./routes/notifications.js"),
+]);
 
 const {
-  router: employeeAuthRouter,
-  requireEmployee,
-} = require("./routes/employeeAuth");
+  initializeSocket,
+  emitEmployeeNotification,
+  emitAdminNotification,
+} = socketModule;
 
-const {
-  router: notificationRouter,
-  createNotification,
-} = require("./routes/notifications");
+const { router: authRouter, requireAdmin } = authModule;
+const { router: employeeAuthRouter, requireEmployee } = employeeAuthModule;
+const { router: notificationRouter, createNotification } = notificationModule;
 
 // ============================================================
 // 5. CREATE EXPRESS APPLICATION
 // ============================================================
 
 const app = express();
-
-app.set("trust proxy", 1);
 
 app.disable("x-powered-by");
 
@@ -79,69 +72,25 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://esparks-certificate-portal.vercel.app",
-];
+  CLIENT_URL,
+].filter(Boolean);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests without Origin
-      // such as Postman/server-to-server requests
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(
-        new Error(`CORS blocked origin: ${origin}`)
-      );
-    },
-    credentials: true,
-  })
-);
 const uniqueAllowedOrigins = [
   ...new Set(allowedOrigins),
 ];
 
-// ============================================================
-// 8. EXPRESS CORS
-// ============================================================
-
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) {
+      // Requests without Origin are allowed for tools and server-to-server calls.
+      if (!origin || uniqueAllowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
-      if (
-        uniqueAllowedOrigins.includes(origin)
-      ) {
-        return callback(null, true);
-      }
-
-      return callback(
-        new Error("CORS origin not allowed."),
-      );
+      return callback(new Error("CORS origin not allowed."));
     },
-
     credentials: true,
-
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
@@ -183,136 +132,7 @@ const httpServer = http.createServer(app);
 // 13. SOCKET.IO INITIALIZATION
 // ============================================================
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: uniqueAllowedOrigins,
-
-    credentials: true,
-
-    methods: ["GET", "POST"],
-  },
-
-  maxHttpBufferSize: 10000,
-});
-
-// ============================================================
-// 14. SOCKET.IO CONNECTION HANDLER
-// ============================================================
-
-io.on("connection", (socket) => {
-  console.log(
-    `🔌 Socket connected: ${socket.id}`,
-  );
-
-  // ----------------------------------------------------------
-  // Employee joins private notification room
-  // ----------------------------------------------------------
-
-  socket.on(
-    "join:employee",
-    (employeeId) => {
-      const id = Number(employeeId);
-
-      if (
-        !Number.isInteger(id) ||
-        id <= 0
-      ) {
-        return;
-      }
-
-      const room = `employee:${id}`;
-
-      socket.join(room);
-
-      console.log(
-        `👤 Employee ${id} joined ${room}`,
-      );
-    },
-  );
-
-  // ----------------------------------------------------------
-  // Admin joins private notification room
-  // ----------------------------------------------------------
-
-  socket.on(
-    "join:admin",
-    (adminId) => {
-      const id = Number(adminId);
-
-      if (
-        !Number.isInteger(id) ||
-        id <= 0
-      ) {
-        return;
-      }
-
-      const room = `admin:${id}`;
-
-      socket.join(room);
-
-      console.log(
-        `👨‍💼 Admin ${id} joined ${room}`,
-      );
-    },
-  );
-
-  // ----------------------------------------------------------
-  // Socket disconnect
-  // ----------------------------------------------------------
-
-  socket.on(
-    "disconnect",
-    (reason) => {
-      console.log(
-        `🔌 Socket disconnected: ${socket.id} - ${reason}`,
-      );
-    },
-  );
-});
-
-// ============================================================
-// 15. SOCKET NOTIFICATION HELPERS
-// ============================================================
-
-function emitEmployeeNotification(
-  employeeId,
-  notification,
-) {
-  const id = Number(employeeId);
-
-  if (
-    !Number.isInteger(id) ||
-    id <= 0 ||
-    !notification
-  ) {
-    return;
-  }
-
-  io.to(`employee:${id}`).emit(
-    "notification:new",
-    notification,
-  );
-}
-
-function emitAdminNotification(
-  adminId,
-  notification,
-) {
-  const id = Number(adminId);
-
-  if (
-    !Number.isInteger(id) ||
-    id <= 0 ||
-    !notification
-  ) {
-    return;
-  }
-
-  io.to(`admin:${id}`).emit(
-    "notification:new",
-    notification,
-  );
-}
+initializeSocket(httpServer, uniqueAllowedOrigins);
 
 // ============================================================
 // 16. HEALTH CHECK
@@ -434,96 +254,104 @@ app.get(
 // 20. GET SINGLE EMPLOYEE
 // ============================================================
 
+
+
 app.get(
   "/api/admin/employees/:id",
   requireAdmin,
   async (req, res, next) => {
+    const employeeId = req.params.id;
+
+    if (!/^[1-9]\d*$/.test(employeeId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid employee ID.",
+      });
+    }
+
     try {
-      const employeeId = Number(
-        req.params.id,
-      );
+      BigInt(employeeId);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid employee ID.",
+      });
+    }
 
-      if (
-        !Number.isInteger(employeeId) ||
-        employeeId <= 0
-      ) {
-        return res.status(400).json({
-          success: false,
+    try {
+      let employeeResult;
 
-          message:
-            "Invalid employee ID.",
-        });
-      }
-
-      const employeeResult =
-        await pool.query(
-          `
-            SELECT
-              id,
-              name,
-              email,
-              is_active,
-              created_at
-            FROM employee_users
-            WHERE id = $1
-          `,
+      try {
+        employeeResult = await pool.query(
+          `SELECT id, name, email, is_active, created_at
+           FROM employee_users
+           WHERE id = $1
+           LIMIT 1`,
           [employeeId],
         );
+      } catch (error) {
+        console.error("EMPLOYEE QUERY FAILED:", {
+          code: error.code,
+          message: error.message,
+          table: error.table,
+          column: error.column,
+        });
+        throw error;
+      }
 
-      if (
-        employeeResult.rows.length === 0
-      ) {
+      if (employeeResult.rows.length === 0) {
         return res.status(404).json({
           success: false,
-
-          message:
-            "Employee not found.",
+          message: "Employee not found.",
         });
       }
 
-      const certificateResult =
-        await pool.query(
-          `
-            SELECT
-              id,
-              certificate_no,
-              certificate_type,
-              recipient_name,
-              course_name,
-              issuer_name,
-              issue_date,
-              verification_token,
-              status,
-              created_at,
-              revoked_at
-            FROM certificates
-            WHERE employee_id = $1
-            ORDER BY
-              issue_date DESC,
-              id DESC
-          `,
+      let certificateResult;
+
+      try {
+        certificateResult = await pool.query(
+          `SELECT
+             id,
+             certificate_no,
+             certificate_type,
+             recipient_name,
+             course_name,
+             issuer_name,
+             issue_date,
+             verification_token,
+             status,
+             created_at,
+             revoked_at
+           FROM certificates
+           WHERE employee_id = $1
+           ORDER BY issue_date DESC NULLS LAST, id DESC`,
           [employeeId],
         );
+      } catch (error) {
+        console.error("CERTIFICATE QUERY FAILED:", {
+          code: error.code,
+          message: error.message,
+          table: error.table,
+          column: error.column,
+        });
+        throw error;
+      }
 
       return res.status(200).json({
         success: true,
-
-        employee:
-          employeeResult.rows[0],
-
-        certificates:
-          certificateResult.rows,
+        employee: employeeResult.rows[0],
+        certificates: certificateResult.rows,
       });
     } catch (error) {
-      console.error(
-        "Get employee details error:",
-        error,
-      );
-
-      next(error);
+      console.error("GET EMPLOYEE DETAILS FAILED:", {
+        code: error.code,
+        message: error.message,
+      });
+      return next(error);
     }
   },
 );
+
 
 // ============================================================
 // 21. GET ALL CERTIFICATES

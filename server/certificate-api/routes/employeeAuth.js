@@ -1,15 +1,15 @@
-const express = require("express");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const rateLimit = require("express-rate-limit");
-const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+import express from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 
-const pool = require("../db");
+import pool from "../db.js";
 
-const {
+import {
   requireTrustedOrigin,
-} = require("./auth");
+} from "./auth.js";
 
 const router = express.Router();
 
@@ -1131,7 +1131,7 @@ async function requireEmployee(
 // EXPORT
 // =====================================================
 
-module.exports = {
+export {
   router,
   requireEmployee,
 };

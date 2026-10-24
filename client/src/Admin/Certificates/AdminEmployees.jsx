@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./AdminEmployees.css";
 
 import {
@@ -20,6 +21,7 @@ import { apiRequest } from "../../services/api";
 import BackButton from "../../components/BackButton";
 
 export default function AdminEmployees() {
+    const navigate = useNavigate();
   // =========================================================
   // STATE
   // =========================================================
@@ -34,9 +36,12 @@ export default function AdminEmployees() {
 
   const [statusFilter, setStatusFilter] = useState("all");
 
+
+  
   // =========================================================
   // LOAD EMPLOYEES
   // =========================================================
+
 
   useEffect(() => {
     loadEmployees();
@@ -220,15 +225,17 @@ export default function AdminEmployees() {
   // VIEW EMPLOYEE
   // =========================================================
 
-  function viewEmployee(employee) {
-    if (!employee?.id) {
-      return;
-    }
+function viewEmployee(employee) {
+  const employeeId = employee?.id;
 
-    window.location.href =
-      `/admin/employees/${employee.id}`;
+  if (employeeId === undefined || employeeId === null || String(employeeId).trim() === "") {
+    console.error("Missing employee ID:", employee);
+    setError("Unable to open employee details: employee ID is missing.");
+    return;
   }
 
+  navigate(`/admin/employees/${encodeURIComponent(String(employeeId))}`);
+}
   // =========================================================
   // LOADING
   // =========================================================
