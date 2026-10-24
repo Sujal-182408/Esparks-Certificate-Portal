@@ -52,6 +52,7 @@ const { router: notificationRouter, createNotification } = notificationModule;
 // ============================================================
 
 const app = express();
+export default app;
 
 app.disable("x-powered-by");
 
@@ -3619,4 +3620,6 @@ async function startServer() {
 // 48. START APPLICATION
 // ============================================================
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
