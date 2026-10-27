@@ -812,12 +812,21 @@ router.post(
 
         admin: publicAdmin(admin),
       });
-    } catch (error) {
-      return next(error);
-    }
+    }  catch (error) {
+  console.error("ADMIN LOGIN FAILED:", {
+    name: error.name,
+    message: error.message,
+    code: error.code,
+    table: error.table,
+    column: error.column,
+    constraint: error.constraint,
+    stack: error.stack,
+  });
+
+  return next(error);
+}
   },
 );
-
 // =====================================================
 
 // ADMIN ME
@@ -1316,7 +1325,7 @@ router.post(
 
   requireTrustedOrigin,
 
-  (req, res) => {
+  (_req, res) => {
     res.clearCookie(
       ADMIN_COOKIE_NAME,
 

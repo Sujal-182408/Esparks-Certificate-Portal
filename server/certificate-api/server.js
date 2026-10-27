@@ -338,11 +338,40 @@ app.get(
         throw error;
       }
 
-      return res.status(200).json({
-        success: true,
-        employee: employeeResult.rows[0],
-        certificates: certificateResult.rows,
-      });
+let rejectedResult;
+
+try {
+  rejectedResult = await pool.query(
+    `SELECT
+       id,
+       certificate_type,
+       course_name,
+       rejection_reason,
+       created_at,
+       reviewed_at
+     FROM certificate_requests
+     WHERE employee_id = $1
+       AND LOWER(status) = 'rejected'
+     ORDER BY reviewed_at DESC NULLS LAST, created_at DESC, id DESC`,
+    [employeeId],
+  );
+} catch (error) {
+  console.error("REJECTED REQUEST QUERY FAILED:", {
+    code: error.code,
+    message: error.message,
+    table: error.table,
+    column: error.column,
+  });
+  throw error;
+}
+
+    return res.status(200).json({
+  success: true,
+  employee: employeeResult.rows[0],
+  certificates: certificateResult.rows,
+  rejectedRequests: rejectedResult.rows,
+});
+
     } catch (error) {
       console.error("GET EMPLOYEE DETAILS FAILED:", {
         code: error.code,
@@ -828,55 +857,74 @@ app.post(
       // 11. GENERATE CERTIFICATE NUMBER
       // ========================================================
 
-      const certificateYear =
-        new Date().getFullYear();
+ const certificateYear = new Date().getFullYear();
+const prefix = cleanCertificateType === "CERT" ? "EITS-CERT" : "EITS-INTR";
+const certificatePattern = `${prefix}-${certificateYear}-%`;
 
-      const sequenceResult =
-        await client.query(
-          `
-            INSERT INTO certificate_number_sequences
-            (
-              certificate_type,
-              certificate_year,
-              next_number
-            )
-            VALUES
-            (
-              $1,
-              $2,
-              1002
-            )
-            ON CONFLICT
-            (
-              certificate_type,
-              certificate_year
-            )
-            DO UPDATE SET
-              next_number =
-                certificate_number_sequences.next_number + 1
-            RETURNING
-              next_number - 1 AS generated_number
-          `,
-          [
-            cleanCertificateType,
-            certificateYear,
-          ],
-        );
+const sequenceResult = await client.query(
+  `
+    INSERT INTO certificate_number_sequences (
+      certificate_type,
+      certificate_year,
+      next_number
+    )
+    VALUES (
+      $1,
+      $2,
+      GREATEST(
+        1002,
+        COALESCE(
+          (
+            SELECT MAX(
+              substring(certificate_no FROM '[0-9]+$')::integer
+            ) + 1
+            FROM certificates
+            WHERE certificate_type::text = $4::text
+              AND certificate_no LIKE $3
+          ),
+          1002
+        )
+      )
+    )
+    ON CONFLICT (certificate_type, certificate_year)
+    DO UPDATE SET
+      next_number = GREATEST(
+        certificate_number_sequences.next_number,
+        COALESCE(
+          (
+            SELECT MAX(
+              substring(certificate_no FROM '[0-9]+$')::integer
+            ) + 1
+            FROM certificates
+            WHERE certificate_type::text = $4::text
+              AND certificate_no LIKE $3
+          ),
+          1002
+        )
+      )
+    RETURNING next_number
+  `,
+  [
+    cleanCertificateType,
+    certificateYear,
+    certificatePattern,
+    cleanCertificateType,
+  ]
+);
 
-      const generatedNumber =
-        Number(
-          sequenceResult.rows[0]
-            .generated_number,
-        );
+const generatedNumber = Number(sequenceResult.rows[0].next_number);
 
-      const prefix =
-        cleanCertificateType ===
-        "CERT"
-          ? "EITS-CERT"
-          : "EITS-INTR";
+await client.query(
+  `
+    UPDATE certificate_number_sequences
+    SET next_number = next_number + 1
+    WHERE certificate_type = $1
+      AND certificate_year = $2
+  `,
+  [cleanCertificateType, certificateYear]
+);
 
-      const certificateNo =
-        `${prefix}-${certificateYear}-${generatedNumber}`;
+const certificateNo = `${prefix}-${certificateYear}-${generatedNumber}`;
 
       // ========================================================
       // 12. CREATE CERTIFICATE
@@ -940,6 +988,8 @@ app.post(
 
       const certificate =
         certificateResult.rows[0];
+
+
 
       // ========================================================
       // 13. UPDATE REQUEST
@@ -1112,212 +1162,135 @@ app.post(
 // 24. UPDATE CERTIFICATE
 // ============================================================
 
-app.put(
-  "/api/admin/certificates/:id",
-  requireAdmin,
-  async (req, res, next) => {
-    try {
-      const certificateId =
-        Number(req.params.id);
+app.put("/api/admin/certificates/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const certificateId = Number(req.params.id);
 
-      if (
-        !Number.isInteger(
-          certificateId,
-        ) ||
-        certificateId <= 0
-      ) {
-        return res.status(400).json({
-          success: false,
-
-          message:
-            "Invalid certificate ID.",
-        });
-      }
-
-      const {
-        courseName,
-        issuerName,
-        recipientName,
-        issueDate,
-      } = req.body;
-
-      const cleanCourseName =
-        courseName == null
-          ? null
-          : String(
-              courseName,
-            ).trim();
-
-      const cleanIssuerName =
-        issuerName == null
-          ? null
-          : String(
-              issuerName,
-            ).trim();
-
-      const cleanRecipientName =
-        recipientName == null
-          ? null
-          : String(
-              recipientName,
-            ).trim();
-
-      if (
-        cleanCourseName &&
-        cleanCourseName.length >
-          200
-      ) {
-        return res.status(400).json({
-          success: false,
-
-          message:
-            "Course name must not exceed 200 characters.",
-        });
-      }
-
-      if (
-        cleanIssuerName &&
-        cleanIssuerName.length >
-          200
-      ) {
-        return res.status(400).json({
-          success: false,
-
-          message:
-            "Issuer name must not exceed 200 characters.",
-        });
-      }
-
-      if (
-        cleanRecipientName &&
-        cleanRecipientName.length >
-          150
-      ) {
-        return res.status(400).json({
-          success: false,
-
-          message:
-            "Recipient name must not exceed 150 characters.",
-        });
-      }
-
-      let cleanIssueDate = null;
-
-      if (issueDate) {
-        const dateString =
-          String(issueDate).trim();
-
-        if (
-          !/^\d{4}-\d{2}-\d{2}$/.test(
-            dateString,
-          )
-        ) {
-          return res.status(400).json({
-            success: false,
-
-            message:
-              "Issue date must be in YYYY-MM-DD format.",
-          });
-        }
-
-        const parsedDate =
-          new Date(
-            `${dateString}T00:00:00Z`,
-          );
-
-        if (
-          Number.isNaN(
-            parsedDate.getTime(),
-          )
-        ) {
-          return res.status(400).json({
-            success: false,
-
-            message:
-              "Invalid issue date.",
-          });
-        }
-
-        cleanIssueDate =
-          dateString;
-      }
-
-      const result =
-        await pool.query(
-          `
-            UPDATE certificates
-            SET
-              course_name =
-                COALESCE(
-                  $1,
-                  course_name
-                ),
-
-              issuer_name =
-                COALESCE(
-                  $2,
-                  issuer_name
-                ),
-
-              recipient_name =
-                COALESCE(
-                  $3,
-                  recipient_name
-                ),
-
-              issue_date =
-                COALESCE(
-                  $4::date,
-                  issue_date
-                )
-
-            WHERE id = $5
-
-            RETURNING *
-          `,
-          [
-            cleanCourseName,
-
-            cleanIssuerName,
-
-            cleanRecipientName,
-
-            cleanIssueDate,
-
-            certificateId,
-          ],
-        );
-
-      if (
-        result.rows.length === 0
-      ) {
-        return res.status(404).json({
-          success: false,
-
-          message:
-            "Certificate not found.",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-
-        message:
-          "Certificate updated successfully.",
-
-        certificate:
-          result.rows[0],
+    if (!Number.isInteger(certificateId) || certificateId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid certificate ID.",
       });
-    } catch (error) {
-      console.error(
-        "Update certificate error:",
-        error,
-      );
-
-      next(error);
     }
-  },
-);
+
+    const { courseName, issuerName, recipientName, issueDate } = req.body;
+
+    const cleanField = (value) =>
+      value == null ? null : String(value).trim();
+
+    const cleanCourseName = cleanField(courseName);
+    const cleanIssuerName = cleanField(issuerName);
+    const cleanRecipientName = cleanField(recipientName);
+
+    if (cleanCourseName !== null && !cleanCourseName) {
+      return res.status(400).json({
+        success: false,
+        message: "Course name cannot be empty.",
+      });
+    }
+
+    if (cleanIssuerName !== null && !cleanIssuerName) {
+      return res.status(400).json({
+        success: false,
+        message: "Issuer name cannot be empty.",
+      });
+    }
+
+    if (cleanRecipientName !== null && !cleanRecipientName) {
+      return res.status(400).json({
+        success: false,
+        message: "Recipient name cannot be empty.",
+      });
+    }
+
+    if (cleanCourseName && cleanCourseName.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: "Course name must not exceed 200 characters.",
+      });
+    }
+
+    if (cleanIssuerName && cleanIssuerName.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: "Issuer name must not exceed 200 characters.",
+      });
+    }
+
+    if (cleanRecipientName && cleanRecipientName.length > 150) {
+      return res.status(400).json({
+        success: false,
+        message: "Recipient name must not exceed 150 characters.",
+      });
+    }
+
+    let cleanIssueDate = null;
+
+    if (issueDate != null && issueDate !== "") {
+      const dateString = String(issueDate).trim();
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+
+      if (!match) {
+        return res.status(400).json({
+          success: false,
+          message: "Issue date must be in YYYY-MM-DD format.",
+        });
+      }
+
+      const [, year, month, day] = match;
+      const parsedDate = new Date(Date.UTC(+year, +month - 1, +day));
+
+      if (
+        parsedDate.getUTCFullYear() !== +year ||
+        parsedDate.getUTCMonth() !== +month - 1 ||
+        parsedDate.getUTCDate() !== +day
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid issue date.",
+        });
+      }
+
+      cleanIssueDate = dateString;
+    }
+
+    const result = await pool.query(
+      `
+        UPDATE certificates
+        SET
+          course_name = COALESCE($1, course_name),
+          issuer_name = COALESCE($2, issuer_name),
+          recipient_name = COALESCE($3, recipient_name),
+          issue_date = COALESCE($4::date, issue_date)
+        WHERE id = $5
+        RETURNING *
+      `,
+      [
+        cleanCourseName,
+        cleanIssuerName,
+        cleanRecipientName,
+        cleanIssueDate,
+        certificateId,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Certificate not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Certificate updated successfully.",
+      certificate: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Update certificate error:", error);
+    next(error);
+  }
+});
 
 // ============================================================
 // 25. REVOKE CERTIFICATE
