@@ -250,6 +250,58 @@
   color: #94a3b8;
 }
 
+/* ============================================================
+   GRADUATION CAP
+============================================================ */
+
+.certificate-top-icon {
+  position: absolute;
+
+  left: 50%;
+  top: 60px;
+
+  width: 20vw;
+  height: 20vh;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  transform: translateX(-50%);
+}
+
+
+/* ============================================================
+   WATERMARK
+============================================================ */
+
+.certificate-watermark {
+  position: absolute;
+
+  top: 50%;
+  left: 50%;
+
+  width: 40vw;
+  height: 40vh;
+
+  max-width: none;
+  max-height: none;
+
+  object-fit: contain;
+
+  transform:
+    translate(-50%, -50%)
+    rotate(-30deg);
+
+  opacity: 0.065;
+
+  pointer-events: none;
+  user-select: none;
+
+  z-index: 0;
+}
+
 /* Responsive */
 
 @media (max-width: 640px) {

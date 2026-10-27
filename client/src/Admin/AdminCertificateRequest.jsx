@@ -199,13 +199,27 @@ function AdminCertificateRequest() {
 
       const response = await apiRequest("/admin/certificate-requests");
 
-      const data = response?.requests ?? response?.data ?? [];
+console.log("Admin API response:", response);
 
-      const normalizedRequests = Array.isArray(data)
-        ? data.map(normalizeRequest).filter(Boolean)
-        : [];
+const data =
+  response?.requests ??
+  response?.data ??
+  response?.rejectedRequests ??
+  [];
 
-      setRequests(normalizedRequests);
+const normalizedRequests = Array.isArray(data)
+  ? data.map(normalizeRequest).filter(Boolean)
+  : [];
+
+console.log(
+  "Rejected requests received:",
+  normalizedRequests.filter(
+    (request) =>
+      String(request.status || "").trim().toLowerCase() === "rejected"
+  )
+);
+
+setRequests(normalizedRequests);
 
       /*
        * Keep the popup data synchronized after
@@ -277,23 +291,20 @@ function AdminCertificateRequest() {
     });
   }, [requests, searchTerm, statusFilter]);
 
-  const stats = useMemo(() => {
-    return {
-      total: requests.length,
+const stats = useMemo(() => {
+  const countByStatus = (status) =>
+    requests.filter(
+      (request) =>
+        String(request.status || "").trim().toLowerCase() === status
+    ).length;
 
-      pending: requests.filter(
-        (request) => request.status === "pending"
-      ).length,
-
-      issued: requests.filter(
-        (request) => request.status === "issued"
-      ).length,
-
-      rejected: requests.filter(
-        (request) => request.status === "rejected"
-      ).length,
-    };
-  }, [requests]);
+  return {
+    total: requests.length,
+    pending: countByStatus("pending"),
+    issued: countByStatus("issued"),
+    rejected: countByStatus("rejected"),
+  };
+}, [requests]);
 
   const handleView = (request) => {
     setSelectedRequest(request);

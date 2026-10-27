@@ -1,29 +1,27 @@
 // src/services/api.js
 
-const API_URL =
-  "https://esparks-certificate-portal-server.vercel.app/api";
+// const API_URL =
+//   "https://esparks-certificate-portal-server.vercel.app/api";
+
+const API_URL = "/api";
 
 /* =========================================================
    BASE API REQUEST
 ========================================================= */
 
+
+
 export async function apiRequest(path, options = {}) {
+  const { quiet401 = false, ...fetchOptions } = options;
   const url = `${API_URL}${path}`;
 
   try {
     const response = await fetch(url, {
-      ...options,
-
-      // Required for authentication cookies
+      ...fetchOptions,
       credentials: "include",
-
       headers: {
-        ...(options.body
-          ? {
-              "Content-Type": "application/json",
-            }
-          : {}),
-        ...(options.headers || {}),
+        ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+        ...(fetchOptions.headers || {}),
       },
     });
 
@@ -31,22 +29,19 @@ export async function apiRequest(path, options = {}) {
 
     if (!response.ok) {
       const error = new Error(
-        data?.message ||
-          data?.error ||
-          `Request failed with status ${response.status}`
+        data?.message || data?.error || `Request failed with status ${response.status}`
       );
-
       error.status = response.status;
       error.data = data;
       error.url = url;
-
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error(`API Error [${options.method || "GET"}] ${url}:`, error);
-
+    if (!(quiet401 && error.status === 401)) {
+      console.error(`API Error [${fetchOptions.method || "GET"}] ${url}:`, error);
+    }
     throw error;
   }
 }

@@ -643,6 +643,10 @@ function viewEmployee(employee) {
                           </th>
 
                           <th>
+                            Rejected Requests
+                          </th>
+
+                          <th>
                             Registered
                           </th>
 
@@ -755,6 +759,14 @@ function viewEmployee(employee) {
 
                                   </span>
 
+                                </td>
+
+                                {/* REJECTED REQUESTS */}
+
+                                <td>
+                                  <span className={`rejected-request-count ${(Number(employee?.rejected_request_count) || 0) > 0 ? "has-rejections" : ""}`}>
+                                    {Number(employee?.rejected_request_count) || 0}
+                                  </span>
                                 </td>
 
                                 {/* DATE */}
@@ -898,6 +910,13 @@ function viewEmployee(employee) {
                                 <Mail size={15} />
                                 <span>
                                   {email}
+                                </span>
+                              </div>
+
+                              <div>
+                                <UserX size={15} />
+                                <span className={`mobile-rejected-count ${(Number(employee?.rejected_request_count) || 0) > 0 ? "has-rejections" : ""}`}>
+                                  Rejected requests: {Number(employee?.rejected_request_count) || 0}
                                 </span>
                               </div>
 

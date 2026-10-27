@@ -5,7 +5,6 @@ import {
   useEffect,
   useState,
 } from "react";
-
 import { apiRequest } from "../services/api";
 
 const AuthContext = createContext(null);
@@ -14,146 +13,93 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ================================
-  // EMPLOYEE SESSION
-  // ================================
-
   const refreshUser = useCallback(async () => {
     try {
       const data = await apiRequest("/employee-auth/me");
-
       const employee = data?.employee || null;
-
       setUser(employee);
-
       return employee;
     } catch (error) {
       if (error.status === 401) {
         setUser(null);
         return null;
       }
-
-      console.error(
-        "Employee session refresh failed:",
-        error
-      );
-
-      return null;
+      console.error("Employee session refresh failed:", error);
+      throw error;
     }
   }, []);
-
-  // ================================
-  // INITIAL SESSION CHECK
-  // ================================
 
   useEffect(() => {
     let mounted = true;
 
     async function checkEmployeeSession() {
       try {
-        const data = await apiRequest(
-          "/employee-auth/me"
-        );
-
-        if (mounted) {
-          setUser(data?.employee || null);
-        }
+        const data = await apiRequest("/employee-auth/me", { quiet401: true });
+        if (mounted) setUser(data?.employee || null);
       } catch (error) {
         if (error.status !== 401) {
-          console.error(
-            "Employee session check failed:",
-            error
-          );
+          console.error("Employee session check failed:", error);
         }
-
-        if (mounted) {
-          setUser(null);
-        }
+        if (mounted) setUser(null);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     }
 
     checkEmployeeSession();
-
     return () => {
       mounted = false;
     };
   }, []);
 
-  // ================================
-  // EMPLOYEE REGISTER
-  // ================================
-
   async function register(name, email, password) {
     setLoading(true);
-
     try {
-      const data = await apiRequest(
-        "/employee-auth/register",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name: name.trim(),
-            email: email.trim(),
-            password,
-          }),
-        }
-      );
-
-      setUser(data?.employee || null);
-
-      return data;
+      await apiRequest("/employee-auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+      return await refreshUser();
     } finally {
       setLoading(false);
     }
   }
-
-  // ================================
-  // EMPLOYEE LOGIN
-  // ================================
 
   async function login(email, password) {
     setLoading(true);
-
     try {
-      const data = await apiRequest(
-        "/employee-auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            email: email.trim(),
-            password,
-          }),
-        }
-      );
+      await apiRequest("/employee-auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
 
-      const employee = data?.employee || null;
+      const employee = await refreshUser();
 
-      setUser(employee);
+      if (!employee) {
+        throw new Error(
+          "Login succeeded, but the employee session cookie was not recognized.",
+        );
+      }
 
-      return data;
+      return employee;
     } finally {
       setLoading(false);
     }
   }
 
-  // ================================
-  // EMPLOYEE LOGOUT
-  // ================================
-
   async function logout() {
     setLoading(true);
-
     try {
-      await apiRequest(
-        "/employee-auth/logout",
-        {
-          method: "POST",
-        }
-      );
+      await apiRequest("/employee-auth/logout", {
+        method: "POST",
+      });
     } finally {
       setUser(null);
       setLoading(false);
@@ -170,20 +116,14 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user),
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error(
-      "useAuth must be used inside an AuthProvider."
-    );
+    throw new Error("useAuth must be used inside an AuthProvider.");
   }
 
   return context;

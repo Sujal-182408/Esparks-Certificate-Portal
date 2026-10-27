@@ -1,6 +1,6 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
-
+import { AuthProvider } from "./context/AuthContext.jsx";
 // =========================
 // PUBLIC PAGES
 // =========================
@@ -99,16 +99,22 @@ function App() {
         element={<Home />}
       />
 
-      <Route
-        path="/login"
-        element={<Login />}
-      />
-
-      <Route
-        path="/register"
-        element={<Register />}
-      />
-
+     <Route
+  path="/login"
+  element={
+    <AuthProvider>
+      <Login />
+    </AuthProvider>
+  }
+/>
+<Route
+  path="/register"
+  element={
+    <AuthProvider>
+      <Register />
+    </AuthProvider>
+  }
+/>
       <Route
         path="/forgot-password"
         element={<ForgotPassword />}
@@ -129,27 +135,32 @@ function App() {
         element={<CertificateView />}
       />
 
-      <Route
-        path="/certificate/request"
-        element={
-          <ProtectedRoute>
-            <CertificateRequest />
-          </ProtectedRoute>
-        }
-      />
+     <Route
+  path="/certificate/request"
+  element={
+    <AuthProvider>
+      <ProtectedRoute>
+        <CertificateRequest />
+      </ProtectedRoute>
+    </AuthProvider>
+  }
+/>
+
 
       {/* =====================================================
           EMPLOYEE DASHBOARD
       ===================================================== */}
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <EmployeeDashboard />
-          </ProtectedRoute>
-        }
-      />
+    <Route
+  path="/dashboard"
+  element={
+    <AuthProvider>
+      <ProtectedRoute>
+        <EmployeeDashboard />
+      </ProtectedRoute>
+    </AuthProvider>
+  }
+/>
 
       {/* =====================================================
           ADMIN LOGIN

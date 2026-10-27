@@ -27,8 +27,11 @@ export default function EmployeeDetails() {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+ const rejectedRequests = Array.isArray(employee?.rejectedRequests)
+  ? employee.rejectedRequests
+  : [];
 
-  async function loadEmployee() {
+async function loadEmployee() {
   if (!id) {
     setError("Employee ID is missing.");
     setLoading(false);
@@ -54,6 +57,9 @@ export default function EmployeeDetails() {
       ...data.employee,
       certificates: Array.isArray(data.certificates)
         ? data.certificates
+        : [],
+      rejectedRequests: Array.isArray(data.rejectedRequests)
+        ? data.rejectedRequests
         : [],
     });
   } catch (err) {
@@ -458,57 +464,39 @@ export default function EmployeeDetails() {
             CERTIFICATE SUMMARY
         ========================================== */}
 
-        <section className="employee-certificate-summary">
+     <section className="employee-certificate-summary">
+  <div className="employee-summary-card">
+    <div className="employee-summary-icon"><Award size={22} /></div>
+    <div>
+      <span>Total Certificates</span>
+      <strong>{certificateStats.total}</strong>
+    </div>
+  </div>
 
-          <div className="employee-summary-card">
+  <div className="employee-summary-card">
+    <div className="employee-summary-icon"><CheckCircle2 size={22} /></div>
+    <div>
+      <span>Issued</span>
+      <strong>{certificateStats.issued}</strong>
+    </div>
+  </div>
 
-            <div className="employee-summary-icon">
-              <Award size={22} />
-            </div>
+  <div className="employee-summary-card">
+    <div className="employee-summary-icon employee-revoked-icon"><ShieldCheck size={22} /></div>
+    <div>
+      <span>Revoked</span>
+      <strong>{certificateStats.revoked}</strong>
+    </div>
+  </div>
 
-            <div>
-              <span>
-                Total Certificates
-              </span>
-
-              <strong>
-                {certificateStats.total}
-              </strong>
-            </div>
-
-          </div>
-
-<button
-  type="button"
-  onClick={() =>
-    navigate(
-      `/admin/certificates/create?requestId=${request.id}`
-    )
-  }
->
-  Issue
-</button>
-
-
-          <div className="employee-summary-card">
-
-            <div className="employee-summary-icon employee-revoked-icon">
-              <ShieldCheck size={22} />
-            </div>
-
-            <div>
-              <span>
-                Revoked
-              </span>
-
-              <strong>
-                {certificateStats.revoked}
-              </strong>
-            </div>
-
-          </div>
-
-        </section>
+  <div className="employee-summary-card">
+    <div className="employee-summary-icon"><UserX size={22} /></div>
+    <div>
+      <span>Rejected Requests</span>
+      <strong>{rejectedRequests.length}</strong>
+    </div>
+  </div>
+</section>
 
 
         {/* =========================================
@@ -820,6 +808,57 @@ export default function EmployeeDetails() {
 
         </section>
 
+<section className="employee-certificates-section">
+  <div className="employee-section-header">
+    <div>
+      <h2>Rejected Certificate Requests</h2>
+      <p>Certificate requests rejected for this employee, including rejection reasons.</p>
+    </div>
+    <div className="employee-certificate-count">
+      {rejectedRequests.length}{" "}
+      {rejectedRequests.length === 1 ? "Request" : "Requests"}
+    </div>
+  </div>
+
+  {rejectedRequests.length === 0 ? (
+    <div className="employee-empty-certificates">
+      <div className="employee-empty-icon">
+        <CheckCircle2 size={28} />
+      </div>
+      <h3>No rejected requests</h3>
+      <p>This employee has no rejected certificate requests.</p>
+    </div>
+  ) : (
+    <div className="employee-certificates-table-wrapper">
+      <table className="employee-certificates-table">
+        <thead>
+          <tr>
+            <th>Request ID</th>
+            <th>Certificate Type</th>
+            <th>Course</th>
+            <th>Rejection Reason</th>
+            <th>Requested On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rejectedRequests.map((request) => (
+            <tr key={request.id}>
+              <td>#{request.id}</td>
+              <td>{request.certificate_type || "—"}</td>
+              <td>
+                <span className="certificate-course">
+                  {request.course_name || "—"}
+                </span>
+              </td>
+              <td>{request.rejection_reason || "No reason provided"}</td>
+              <td>{formatDate(request.created_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
 
         {/* =========================================
             FOOTER INFORMATION

@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Edit3,
   Loader2,
+  GraduationCap,
 } from "lucide-react";
 
 import { apiRequest } from "../../services/api";
@@ -553,12 +554,8 @@ const ViewCertificate = () => {
 
             </div>
 
-            <div className="certificate-top-icon">
-
-              <div className="certificate-diamond">
-                ◆
-              </div>
-
+           <div className="certificate-top-icon">
+              <GraduationCap className="certificate-graduation-icon" />
             </div>
 
           </header>

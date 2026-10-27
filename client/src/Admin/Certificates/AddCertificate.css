@@ -1,0 +1,250 @@
+
+.add-certificate-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 40px 24px;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 10% 0%, rgba(0,229,255,.07), transparent 30%), #03070b;
+  color: #fff;
+}
+.add-certificate-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(0,229,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,.025) 1px, transparent 1px);
+  background-size: 55px 55px;
+  mask-image: linear-gradient(to bottom, #000, transparent 85%);
+}
+.add-certificate-container {
+  width: min(100%, 1000px);
+  margin: 0 auto;
+}
+.add-certificate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.add-certificate-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #00e5ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+.add-certificate-title {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 850;
+  letter-spacing: -1.5px;
+}
+.add-certificate-title span {
+  color: #00e5ff;
+}
+.add-certificate-subtitle {
+  margin: 9px 0 0;
+  color: #78909c;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.add-certificate-panel {
+  margin-bottom: 20px;
+  padding: 26px;
+  border: 1px solid rgba(0,229,255,.12);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(7,16,24,.97), rgba(5,10,15,.97));
+  box-shadow: 0 20px 55px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.025);
+}
+.add-certificate-panel h2 {
+  margin: 0 0 23px;
+  color: #f8fafc;
+  font-size: 17px;
+  font-weight: 750;
+}
+.add-certificate-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.add-certificate-info {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+}
+.add-certificate-info-label {
+  margin-bottom: 7px;
+  color: #607d8b;
+  font-size: 11px;
+}
+.add-certificate-info-value {
+  color: #e2f3f8;
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.add-certificate-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.add-certificate-field {
+  min-width: 0;
+}
+.add-certificate-field.full {
+  grid-column: 1 / -1;
+}
+.add-certificate-field label {
+  display: block;
+  margin-bottom: 9px;
+  color: #b0bec5;
+  font-size: 12px;
+  font-weight: 650;
+}
+.add-certificate-field input,
+.add-certificate-field select {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(0,229,255,.13);
+  border-radius: 10px;
+  outline: none;
+  background: #050c12;
+  color: #e2f3f8;
+  color-scheme: dark;
+  font: inherit;
+  font-size: 13px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.add-certificate-field input:focus,
+.add-certificate-field select:focus {
+  border-color: #00bfe8;
+  box-shadow: 0 0 0 3px rgba(0,229,255,.09);
+}
+.add-certificate-field input::placeholder {
+  color: #455a64;
+}
+.add-certificate-field input:disabled,
+.add-certificate-field select:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+.add-certificate-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.add-certificate-button {
+  min-height: 43px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 17px;
+  border: 1px solid rgba(0,229,255,.15);
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  color: #b0bec5;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+  transition: .2s ease;
+}
+.add-certificate-button:hover:not(:disabled) {
+  border-color: rgba(0,229,255,.4);
+  background: rgba(0,229,255,.07);
+  color: #fff;
+}
+.add-certificate-button.primary {
+  border: 0;
+  background: linear-gradient(135deg, #00e5ff, #008cff, #006eff);
+  color: #001018;
+  box-shadow: 0 8px 24px rgba(0,174,255,.15);
+}
+.add-certificate-button.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0,174,255,.28);
+}
+.add-certificate-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.add-certificate-alert {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.add-certificate-alert.error {
+  border-color: rgba(239,68,68,.25);
+  background: rgba(239,68,68,.07);
+  color: #fca5a5;
+}
+.add-certificate-alert.success {
+  border-color: rgba(34,197,94,.25);
+  background: rgba(34,197,94,.07);
+  color: #86efac;
+}
+.add-certificate-state {
+  width: min(100%, 650px);
+  margin: 10vh auto;
+  padding: 35px;
+  border: 1px solid rgba(0,229,255,.12);
+  border-radius: 20px;
+  background: #071018;
+  text-align: center;
+  box-shadow: 0 20px 55px rgba(0,0,0,.3);
+}
+.add-certificate-state h1 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+.add-certificate-state p {
+  margin: 0 0 22px;
+  color: #78909c;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.add-certificate-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 18px;
+  border: 3px solid rgba(0,229,255,.12);
+  border-top-color: #00e5ff;
+  border-right-color: #0077ff;
+  border-radius: 50%;
+  animation: add-certificate-spin .8s linear infinite;
+}
+@keyframes add-certificate-spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 650px) {
+  .add-certificate-page { padding: 25px 15px; }
+  .add-certificate-panel { padding: 20px 16px; border-radius: 16px; }
+  .add-certificate-info-grid,
+  .add-certificate-form-grid { grid-template-columns: 1fr; }
+  .add-certificate-field.full { grid-column: auto; }
+  .add-certificate-actions { flex-direction: column-reverse; }
+  .add-certificate-button { width: 100%; box-sizing: border-box; }
+  .add-certificate-state { padding: 26px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .add-certificate-spinner { animation-duration: 2s; }
+  .add-certificate-button { transition: none; }
+}
