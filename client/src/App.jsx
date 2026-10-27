@@ -1,6 +1,6 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
-import { AuthProvider } from "./context/AuthContext.jsx";
+
 // =========================
 // PUBLIC PAGES
 // =========================
@@ -102,17 +102,17 @@ function App() {
      <Route
   path="/login"
   element={
-    <AuthProvider>
+   
       <Login />
-    </AuthProvider>
+  
   }
 />
 <Route
   path="/register"
   element={
-    <AuthProvider>
+  
       <Register />
-    </AuthProvider>
+   
   }
 />
       <Route
@@ -138,11 +138,11 @@ function App() {
      <Route
   path="/certificate/request"
   element={
-    <AuthProvider>
+   
       <ProtectedRoute>
         <CertificateRequest />
       </ProtectedRoute>
-    </AuthProvider>
+  
   }
 />
 
@@ -154,11 +154,11 @@ function App() {
     <Route
   path="/dashboard"
   element={
-    <AuthProvider>
+   
       <ProtectedRoute>
         <EmployeeDashboard />
       </ProtectedRoute>
-    </AuthProvider>
+    
   }
 />
 
