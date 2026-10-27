@@ -48,11 +48,8 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   limit: 10,
-
   standardHeaders: true,
-
   legacyHeaders: false,
 });
 

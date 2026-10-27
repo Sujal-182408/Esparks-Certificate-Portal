@@ -52,6 +52,9 @@ const { router: notificationRouter, createNotification } = notificationModule;
 // ============================================================
 
 const app = express();
+
+app.set("trust proxy", 1);
+
 export default app;
 
 app.disable("x-powered-by");
@@ -3236,29 +3239,18 @@ app.post(
 // 43. PUBLIC CERTIFICATE VERIFICATION RATE LIMIT
 // ============================================================
 
-const verifyLimiter =
-  rateLimit({
-    windowMs:
-      15 * 60 * 1000,
-
-    limit: 60,
-
-    standardHeaders:
-      "draft-8",
-
-    legacyHeaders: false,
-
-    message: {
-      success: false,
-
-      valid: false,
-
-      status: "invalid",
-
-      message:
-        "Too many verification requests. Please try again later.",
-    },
-  });
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    success: false,
+    valid: false,
+    status: "invalid",
+    message: "Too many verification requests. Please try again later.",
+  },
+});
 
 // ============================================================
 // 44. PUBLIC CERTIFICATE VERIFICATION
