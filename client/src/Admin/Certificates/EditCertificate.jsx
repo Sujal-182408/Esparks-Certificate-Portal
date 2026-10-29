@@ -4,7 +4,7 @@ import { ArrowLeft, Save, FilePenLine } from "lucide-react";
 import BackButton from "../../components/BackButton";
 import "./EditCertificate.css";
 
-const API_URL = "/api";
+const API_URL = `${(import.meta.env.VITE_API_URL || "").replace(/\/+$/, "")}/api`;
 
 export default function EditCertificate() {
   const { id } = useParams();
