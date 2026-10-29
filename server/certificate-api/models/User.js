@@ -1,3 +1,4 @@
+
 import pool from "../db.js";
 
 const User = {
@@ -8,7 +9,6 @@ const User = {
        RETURNING id, name, email, employee_id, role, created_at, updated_at`,
       [name.trim(), email.trim(), employeeId.trim(), password, role]
     );
-
     return result.rows[0];
   },
 
@@ -20,7 +20,6 @@ const User = {
        LIMIT 1`,
       [email.trim()]
     );
-
     return result.rows[0] || null;
   },
 
@@ -32,7 +31,6 @@ const User = {
        LIMIT 1`,
       [id]
     );
-
     return result.rows[0] || null;
   }
 };

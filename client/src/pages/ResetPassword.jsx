@@ -74,12 +74,10 @@ export default function ResetPassword() {
   return;
 }
 
-    if (form.password.length > 128) {
-      setError(
-        "Password must not exceed 128 characters."
-      );
-      return;
-    }
+    if (new TextEncoder().encode(form.password).length > 72) {
+  setError("Password must not exceed 72 UTF-8 bytes.");
+  return;
+}
 
     if (
       form.password !== form.confirmPassword
@@ -337,7 +335,7 @@ export default function ResetPassword() {
                     onChange={handleChange}
                     placeholder="Enter new password"
                     autoComplete="new-password"
-                    minLength={8}
+                    minLength={10}
                     maxLength={128}
                     required
                     disabled={loading}
@@ -406,7 +404,7 @@ export default function ResetPassword() {
                     placeholder="Confirm new password"
                     autoComplete="new-password"
                     minLength={8}
-                    maxLength={128}
+                    maxLength={78}
                     required
                     disabled={loading}
                     className="min-w-0 w-full bg-transparent py-4 text-sm text-white outline-none placeholder:text-slate-700"

@@ -8,9 +8,9 @@ import rateLimit from "express-rate-limit";
 
 import crypto from "node:crypto";
 
-import nodemailer from "nodemailer";
 
 import pool from "../db.js";
+import { sendGmailEmail } from "../utils/gmail.js";
 
 const router = express.Router();
 
@@ -274,39 +274,9 @@ function escapeHtml(value) {
 
 // =====================================================
 
-// MAIL TRANSPORTER
+// GMAIL API EMAIL DELIVERY
 
 // =====================================================
-
-function getMailTransporter() {
-  const {
-    SMTP_HOST,
-
-    SMTP_PORT,
-
-    SMTP_USER,
-
-    SMTP_PASSWORD,
-  } = process.env;
-
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASSWORD) {
-    throw new Error("SMTP configuration is missing.");
-  }
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-
-    port: Number(SMTP_PORT),
-
-    secure: Number(SMTP_PORT) === 465,
-
-    auth: {
-      user: SMTP_USER,
-
-      pass: SMTP_PASSWORD,
-    },
-  });
-}
 
 // =====================================================
 
@@ -325,12 +295,7 @@ async function sendPasswordResetEmail({
     token,
   )}&type=admin`;
 
-  const transporter = getMailTransporter();
-
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
-
-  await transporter.sendMail({
-    from,
+  await sendGmailEmail({
 
     to: email,
 

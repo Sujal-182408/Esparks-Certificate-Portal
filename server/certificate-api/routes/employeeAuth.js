@@ -3,9 +3,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
 
 import pool from "../db.js";
+import { sendGmailEmail } from "../utils/gmail.js";
 
 import {
   requireTrustedOrigin,
@@ -219,42 +219,8 @@ function hashResetToken(token) {
 }
 
 // =====================================================
-// MAIL TRANSPORTER
+// GMAIL API EMAIL DELIVERY
 // =====================================================
-
-function getMailTransporter() {
-  const {
-    SMTP_HOST,
-    SMTP_PORT,
-    SMTP_USER,
-    SMTP_PASSWORD,
-  } = process.env;
-
-  if (
-    !SMTP_HOST ||
-    !SMTP_PORT ||
-    !SMTP_USER ||
-    !SMTP_PASSWORD
-  ) {
-    throw new Error(
-      "SMTP configuration is missing."
-    );
-  }
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-
-    port: Number(SMTP_PORT),
-
-    secure:
-      Number(SMTP_PORT) === 465,
-
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASSWORD,
-    },
-  });
-}
 
 // =====================================================
 // HTML ESCAPE
@@ -287,15 +253,7 @@ async function sendPasswordResetEmail({
       token
     )}&type=employee`;
 
-  const transporter =
-    getMailTransporter();
-
-  const from =
-    process.env.MAIL_FROM ||
-    process.env.SMTP_USER;
-
-  await transporter.sendMail({
-    from,
+  await sendGmailEmail({
 
     to: email,
 
@@ -980,19 +938,16 @@ router.post(
         [reset.user_id]
       );
 
-      await client.query(
-        "COMMIT"
-      );
+      await client.query("COMMIT");
+transactionStarted = false;
 
-      transactionStarted =
-        false;
+// Require the employee to log in with the new password.
+clearSessionCookie(res);
 
-      return res.json({
-        success: true,
-
-        message:
-          "Password reset successful. Please login again.",
-      });
+return res.json({
+  success: true,
+  message: "Password reset successful. Please login again.",
+});
     } catch (error) {
       if (transactionStarted) {
         try {

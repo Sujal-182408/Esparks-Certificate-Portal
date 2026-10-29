@@ -415,4 +415,4 @@ router.get(
 );
 
 export { router };
-export default router;
+export default router

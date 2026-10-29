@@ -1,9 +1,9 @@
 // src/services/api.js
 
-// const API_URL =
-//   "https://esparks-certificate-portal-server.vercel.app/api";
 
-const API_URL = `${(import.meta.env.VITE_API_URL || "").replace(/\/+$/, "")}/api`;
+
+const API_URL = `${(import.meta.env.VITE_API_URL || "https://esparks-certificate-portal-server.vercel.app").replace(/\/+$/, "")}/api`;
+
 
 /* =========================================================
    BASE API REQUEST

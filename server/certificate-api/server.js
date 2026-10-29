@@ -13,6 +13,7 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
+import { sendGmailEmail } from "./utils/gmail.js";
 
 // ESM equivalent of __dirname.
 const __filename = fileURLToPath(import.meta.url);
@@ -68,6 +69,106 @@ const PORT = Number(process.env.PORT) || 5000;
 const CLIENT_URL =
   process.env.CLIENT_URL ||
   "http://localhost:5174";
+
+// ============================================================
+// GMAIL API EMAIL NOTIFICATIONS (NO SMTP)
+// ============================================================
+
+function escapeEmailHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+async function sendCertificateStatusEmail({
+  to,
+  employeeName,
+  courseName,
+  status,
+  certificateNo,
+  verificationToken,
+  rejectionReason,
+}) {
+  if (!to || !String(to).trim()) {
+    console.warn("Certificate email skipped: employee email is missing.");
+    return false;
+  }
+
+  const issued = status === "issued";
+  const safeName = escapeEmailHtml(employeeName || "Employee");
+  const safeCourse = escapeEmailHtml(courseName || "your course");
+  const safeCertificateNo = escapeEmailHtml(certificateNo || "");
+  const safeReason = escapeEmailHtml(rejectionReason || "Please contact the administrator for more information.");
+  const clientUrl = (process.env.CLIENT_URL || CLIENT_URL).replace(/\/+$/, "");
+  const verificationUrl = verificationToken
+    ? `${clientUrl}/verify?token=${encodeURIComponent(verificationToken)}`
+    : `${clientUrl}/employee/dashboard`;
+
+  const subject = issued
+    ? "Your eSparks Certificate Has Been Issued"
+    : "Update on Your eSparks Certificate Request";
+
+  const text = issued
+    ? `Hello ${employeeName || "Employee"},\n\nYour certificate request for "${courseName || "your course"}" has been approved and your certificate has been issued.\nCertificate number: ${certificateNo || "See your employee portal"}\n\nView and verify your certificate: ${verificationUrl}\n\nRegards,\neSparks IT Solutions`
+    : `Hello ${employeeName || "Employee"},\n\nYour certificate request for "${courseName || "your course"}" has been rejected.\nReason: ${rejectionReason || "Please contact the administrator for more information."}\n\nIf you have questions, please contact the administrator.\n\nRegards,\neSparks IT Solutions`;
+
+  const html = issued
+    ? `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#172033;line-height:1.6"><div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff"><h2 style="margin:0;color:#67e8f9">Certificate Issued</h2><p style="margin:6px 0 0">eSparks IT Solutions</p></div><div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px"><p>Hello ${safeName},</p><p>Your certificate request for <strong>${safeCourse}</strong> has been approved and your certificate has been issued.</p><p><strong>Certificate number:</strong> ${safeCertificateNo}</p><p><a href="${escapeEmailHtml(verificationUrl)}" style="display:inline-block;background:#0891b2;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">View Certificate</a></p><p style="color:#64748b;font-size:13px">You can also sign in to the employee portal to access your certificate.</p><p>Regards,<br><strong>eSparks IT Solutions</strong></p></div></div>`
+    : `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#172033;line-height:1.6"><div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff"><h2 style="margin:0;color:#fca5a5">Certificate Request Update</h2><p style="margin:6px 0 0">eSparks IT Solutions</p></div><div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px"><p>Hello ${safeName},</p><p>Your certificate request for <strong>${safeCourse}</strong> has been rejected.</p><div style="background:#fff1f2;border-left:4px solid #e11d48;padding:12px 16px;border-radius:6px"><strong>Reason</strong><p style="margin:6px 0 0;white-space:pre-wrap">${safeReason}</p></div><p>If you have questions or believe this decision needs clarification, please contact the administrator.</p><p>Regards,<br><strong>eSparks IT Solutions</strong></p></div></div>`;
+
+  await sendGmailEmail({
+    to: String(to).trim(),
+    subject,
+    text,
+    html,
+  });
+
+  return true;
+}
+
+// Email failures must not undo a certificate decision already committed to the database.
+async function sendCertificateStatusEmailSafely(details) {
+  try {
+    await sendCertificateStatusEmail(details);
+    console.log(`Certificate status email sent: ${details.status}`);
+  } catch (error) {
+    console.error("Certificate status email failed:", error.message);
+  }
+}
+
+// Notify the administrator when an employee submits a certificate request.
+async function sendAdminCertificateRequestEmail({ employee, request }) {
+  const to = String(process.env.ADMIN_EMAIL || "nsujalkant@gmail.com").trim();
+  const clientUrl = (process.env.CLIENT_URL || CLIENT_URL).replace(/\/+$/, "");
+  const loginUrl = `${clientUrl}/admin/login?requestId=${encodeURIComponent(request.id)}`;
+  const employeeName = escapeEmailHtml(employee.name || "Employee");
+  const employeeEmail = escapeEmailHtml(employee.email || "Not provided");
+  const certificateType = escapeEmailHtml(request.certificate_type || "Not specified");
+  const courseName = escapeEmailHtml(request.course_name || "Not specified");
+  const details = escapeEmailHtml(request.additional_details || "No additional details provided.");
+  const duration = request.duration_months
+    ? `${escapeEmailHtml(request.duration_months)} month(s)`
+    : "Not applicable";
+  const submittedAt = escapeEmailHtml(request.created_at || new Date().toISOString());
+  await sendGmailEmail({
+    to,
+    subject: `New Certificate Request #${request.id} — ${employee.name || "Employee"}`,
+    text: `A new certificate request is waiting for review.\n\nRequest ID: ${request.id}\nEmployee: ${employee.name || "Employee"}\nEmployee email: ${employee.email || "Not provided"}\nCertificate type: ${request.certificate_type || "Not specified"}\nCourse: ${request.course_name || "Not specified"}\nDuration: ${request.duration_months ? `${request.duration_months} month(s)` : "Not applicable"}\nAdditional details: ${request.additional_details || "None"}\nStatus: pending\n\nReview request (admin login required): ${loginUrl}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033;line-height:1.6"><div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff"><h2 style="margin:0;color:#67e8f9">New Certificate Request</h2><p style="margin:6px 0 0">eSparks IT Solutions Certificate Portal</p></div><div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px"><p>A new employee certificate request is waiting for your review.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Request ID</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeEmailHtml(request.id)}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee email</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeEmail}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Certificate type</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${certificateType}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Course</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${courseName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Duration</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${duration}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Submitted</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${submittedAt}</td></tr><tr><td style="padding:8px;vertical-align:top"><strong>Additional details</strong></td><td style="padding:8px;white-space:pre-wrap">${details}</td></tr></table><p style="margin:24px 0"><a href="${escapeEmailHtml(loginUrl)}" style="display:inline-block;background:#0891b2;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Review Request</a></p><p style="color:#64748b;font-size:13px">For security, this button opens the admin login page first. Sign in to review the request. The email link does not approve or issue a certificate by itself.</p><p>Regards,<br><strong>Certificate Management System</strong></p></div></div>`,
+  });
+}
+
+async function sendAdminCertificateRequestEmailSafely(details) {
+  try {
+    await sendAdminCertificateRequestEmail(details);
+  } catch (error) {
+    console.error("Admin certificate request email failed:", error.message);
+  }
+}
 // ============================================================
 // 7. CORS CONFIGURATION
 // ============================================================
@@ -76,27 +177,26 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "https://esparks-certificate-portal.vercel.app",
+  "https://certificate.esparksit.com",
   CLIENT_URL,
 ].filter(Boolean);
 
-const uniqueAllowedOrigins = [
-  ...new Set(allowedOrigins),
-];
+const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Requests without Origin are allowed for tools and server-to-server calls.
-      if (!origin || uniqueAllowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error("CORS origin not allowed."));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
+console.log("CLIENT_URL:", CLIENT_URL);
+console.log("CORS allowed origins:", uniqueAllowedOrigins);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || uniqueAllowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("CORS origin not allowed."));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
 // ============================================================
 // 9. SECURITY HEADERS
@@ -1118,6 +1218,16 @@ const certificateNo = `${prefix}-${certificateYear}-${generatedNumber}`;
         employeeId,
         notification,
       );
+
+      // Send email after commit so email delivery issues cannot roll back issuance.
+      await sendCertificateStatusEmailSafely({
+        to: request.employee_email,
+        employeeName: request.employee_name,
+        courseName: cleanCourseName,
+        status: "issued",
+        certificateNo: certificate.certificate_no,
+        verificationToken: certificate.verification_token,
+      });
 
       // ========================================================
       // 18. RESPONSE
@@ -2342,6 +2452,13 @@ app.post(
         );
       }
 
+      // Email is sent after the request transaction commits. A mail failure
+      // must not undo a successfully saved employee request.
+      await sendAdminCertificateRequestEmailSafely({
+        employee,
+        request,
+      });
+
       return res.status(201).json({
         success: true,
 
@@ -3041,10 +3158,15 @@ app.post(
       const requestResult =
         await client.query(
           `
-            SELECT *
-            FROM certificate_requests
-            WHERE id = $1
-            FOR UPDATE
+            SELECT
+              cr.*,
+              e.name AS employee_name,
+              e.email AS employee_email
+            FROM certificate_requests cr
+            INNER JOIN employee_users e
+              ON e.id = cr.employee_id
+            WHERE cr.id = $1
+            FOR UPDATE OF cr
           `,
           [requestId],
         );
@@ -3176,6 +3298,15 @@ app.post(
         request.employee_id,
         notification,
       );
+
+      // Send email after commit; a mail failure must not undo rejection.
+      await sendCertificateStatusEmailSafely({
+        to: request.employee_email,
+        employeeName: request.employee_name,
+        courseName: request.course_name,
+        status: "rejected",
+        rejectionReason: finalReason,
+      });
 
       return res.status(200).json({
         success: true,

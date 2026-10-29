@@ -1,4 +1,3 @@
-
 import { Pool } from "@neondatabase/serverless";
 
 if (!process.env.DATABASE_URL) {
@@ -16,4 +15,4 @@ pool.on("error", (error) => {
   console.error("Unexpected PostgreSQL pool error:", error.message);
 });
 
-export default pool;
+export default pool
