@@ -13,7 +13,7 @@ import {
 import QRScanner from "../components/QRScanner";
 import { apiRequest } from "../services/api";
 import { useNavigate } from "react-router-dom";
-
+import brandLogo from "../assets/brand.png";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -212,7 +212,7 @@ const navigate = useNavigate();
         <header className="mb-8 text-center">
           <div className="mb-4 flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 shadow-lg shadow-cyan-500/10">
-              <ShieldCheck className="h-9 w-9 text-cyan-400" />
+             <img className="w-11 h-10" src={brandLogo} alt="" />
             </div>
           </div>
 
@@ -246,8 +246,8 @@ const navigate = useNavigate();
 
                 <div className="border-b border-emerald-400/10 bg-emerald-400/5 px-6 py-10 text-center sm:px-10">
 
-                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-400/10 ring-8 ring-emerald-400/5">
-                    <ShieldCheck className="h-11 w-11 text-emerald-400" />
+                  <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-400/30 ring-8 ring-emerald-400/5">
+                   <img className="w-14 h-8" src={brandLogo} alt="" />
                   </div>
 
                   <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">

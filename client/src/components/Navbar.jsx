@@ -1,7 +1,7 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ShieldCheck, LogOut, LayoutDashboard } from "lucide-react";
+import {  LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-
+import brandLogo from "../assets/brand.png";
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -37,11 +37,11 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <span className="rounded-xl bg-cyan-400/10 p-2 text-cyan-300">
-            <ShieldCheck size={25} />
+            <img className="w-7 h-7 object-contain" src={brandLogo} alt="" />
           </span>
 
-          <span className="text-lg font-bold tracking-tight text-white">
-            ESPARKS<span className="text-cyan-400">IT SOLUTIONS</span>
+          <span className="text-lg font-bold tracking-wide text-white">
+            ESPARKS {" "}<span className="text-cyan-400">IT SOLUTIONS</span>
           </span>
         </Link>
 

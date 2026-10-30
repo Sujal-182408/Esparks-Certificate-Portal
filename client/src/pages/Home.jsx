@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
-import { ArrowRight, BadgeCheck, QrCode, ShieldCheck } from "lucide-react";
-
+import { ArrowRight, BadgeCheck, QrCode } from "lucide-react";
+import brandLogo from "../assets/brand.png";
 import Navbar from "../components/Navbar";
 
 export default function Home() {
@@ -62,7 +62,7 @@ export default function Home() {
               text-cyan-300
             "
           >
-            <ShieldCheck size={17} />
+              <img className="w-7 h-7 object-contain" src={brandLogo} alt="eSparks IT Solutions" />
             <span>Secure Certificate Verification</span>
           </div>
 
@@ -258,26 +258,13 @@ export default function Home() {
               hover:bg-white/5
             "
           >
-            <div
-              className="
-                mb-5
-                flex
-                h-12
-                w-12
-                items-center
-                justify-center
-                rounded-xl
-                border
-                border-cyan-400/20
-                bg-cyan-400/10
-                text-cyan-400
-                transition-all
-                duration-300
-                group-hover:bg-cyan-400/20
-              "
-            >
-              <ShieldCheck size={23} />
-            </div>
+       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-400 transition-all duration-300 group-hover:bg-cyan-400/20">
+  <img
+    className="h-12 w-12 object-contain"
+    src={brandLogo}
+    alt="eSparks IT Solutions"
+  />
+</div>
 
             <h3 className="text-xl font-semibold text-white">Secure Tokens</h3>
 
