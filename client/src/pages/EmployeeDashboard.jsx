@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import {
   Activity,
   ArrowRight,
-  Award,
+
   BadgeCheck,
   BookOpen,
   CalendarDays,
@@ -21,13 +21,12 @@ import {
   QrCode,
   Radio,
   ScanLine,
-  Shield,
   ShieldCheck,
   Sparkles,
   User,
   X,
 } from "lucide-react";
-
+import brandLogo from "../assets/brand.png";
 import { apiRequest } from "../services/api";
 import "./EmployeeDashboard.css";
 
@@ -225,10 +224,7 @@ function EmptyCertificates({
       <div className="ed-empty-glow" />
 
       <div className="ed-empty-icon">
-        <Award
-          size={38}
-          strokeWidth={1.2}
-        />
+       <img src={brandLogo} alt="eSparks IT Solutions" />
       </div>
 
       <div className="ed-empty-content">
@@ -826,7 +822,7 @@ export default function EmployeeDashboard() {
 
             <div className="ed-brand-icon">
               <div className="ed-brand-inner">
-                <Award size={19} />
+                <img src={brandLogo} alt="eSparks IT Solutions" />
               </div>
             </div>
 
@@ -838,9 +834,9 @@ export default function EmployeeDashboard() {
                 </span>
               </p>
 
-              <p className="ed-brand-subtitle">
+              {/* <p className="ed-brand-subtitle">
                 Digital Credential Network
-              </p>
+              </p> */}
             </div>
 
           </div>
@@ -1544,7 +1540,7 @@ export default function EmployeeDashboard() {
           <div className="ed-footer-left">
 
             <div className="ed-footer-icon">
-              <ShieldCheck size={12} />
+            <img src={brandLogo} alt="Esparks IT Solution" />
             </div>
 
             <span>

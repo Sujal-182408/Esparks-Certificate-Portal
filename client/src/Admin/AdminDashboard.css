@@ -122,6 +122,11 @@
   color: #00e5ff;
 }
 
+.admin-loader img{
+  width: 25px;
+  height: 25px;
+}
+
 .admin-loader-ring {
   position: absolute;
   inset: 0;
@@ -187,8 +192,8 @@
 }
 
 .admin-brand-logo {
-  width: 43px;
-  height: 43px;
+  width: 46px;
+  height: 46px;
 
   display: flex;
   align-items: center;
@@ -196,7 +201,7 @@
 
   border-radius: 12px;
 
-  color: #ffffff;
+ 
 
   background:
     linear-gradient(
@@ -209,6 +214,11 @@
   box-shadow:
     0 0 25px rgba(0, 200, 255, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.admin-brand-logo img{
+  width: 30px;
+  height: 30px;
 }
 
 .admin-brand h1 {
@@ -909,15 +919,15 @@
   border:
     1px solid rgba(0, 229, 255, 0.3);
 
-  border-radius: 25px;
+  border-radius: 50px;
 
   color: #67e8f9;
 
   background:
     linear-gradient(
       145deg,
-      rgba(0, 229, 255, 0.13),
-      rgba(0, 91, 255, 0.1)
+      rgba(0, 229, 255, 0.077),
+      rgba(38, 108, 239, 0.1)
     );
 
   box-shadow:
@@ -925,6 +935,11 @@
     inset 0 0 25px rgba(0, 229, 255, 0.04);
 
   backdrop-filter: blur(10px);
+}
+
+.hero-shield img{
+  height: 45px;
+  width: 45px;
 }
 
 .hero-floating-card {
@@ -1600,6 +1615,11 @@
     align-items: flex-start;
   }
 }
+
+  .admin-footer img{
+    width: 25px;
+    height: 25px;
+  }
 
 @media (max-width: 400px) {
   .admin-header-inner,

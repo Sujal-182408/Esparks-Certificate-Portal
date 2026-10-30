@@ -1,3 +1,4 @@
+
 import crypto from "node:crypto";
 
 async function getGmailAccessToken() {
@@ -7,7 +8,7 @@ async function getGmailAccessToken() {
 
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error(
-      "Gmail API is not configured. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN."
+      "Gmail API is not configured. Check GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN."
     );
   }
 
@@ -94,48 +95,69 @@ function buildRawEmail({ from, to, subject, text, html }) {
     .replace(/=+$/g, "");
 }
 
-export async function sendGmailEmail({
-  to,
-  subject,
-  text,
-  html
-}) {
-  if (!to || !String(to).trim()) {
+
+export async function sendGmailEmail({ to, subject, text, html }) {
+  const recipient = String(to || "").trim();
+
+  if (!recipient) {
     throw new Error("Email recipient is required.");
   }
 
-  const gmailUser =
-    process.env.GMAIL_USER || "nsujalkant@gmail.com";
-
-  const from = process.env.MAIL_FROM || gmailUser;
-  const accessToken = await getGmailAccessToken();
-
-  const raw = buildRawEmail({
-    from,
-    to: String(to).trim(),
-    subject,
-    text,
-    html
-  });
-
-  const response = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(gmailUser)}/messages/send`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ raw })
-    }
-  );
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(
-      `Gmail API send failed (${response.status}): ${errorBody.slice(0, 500)}`
-    );
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    throw new Error(`Invalid email recipient: ${recipient}`);
   }
 
-  return true;
+  if (!subject || !String(subject).trim()) {
+    throw new Error("Email subject is required.");
+  }
+
+  if (!text && !html) {
+    throw new Error("Email must contain text or HTML content.");
+  }
+
+  const gmailUser = process.env.GMAIL_USER || "nsujalkant@gmail.com";
+  const from = process.env.MAIL_FROM || gmailUser;
+
+  try {
+    console.log(`[GMAIL] Sending email to: ${recipient}`);
+
+    const accessToken = await getGmailAccessToken();
+
+    const raw = buildRawEmail({
+      from,
+      to: recipient,
+      subject: String(subject).trim(),
+      text: text || "",
+      html: html || ""
+    });
+
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ raw })
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `Gmail API failed (${response.status}): ${errorBody.slice(0, 1000)}`
+      );
+    }
+
+    const result = await response.json();
+
+    console.log(`[GMAIL] Email accepted by Gmail API. Recipient: ${recipient}, Message ID: ${result.id}`);
+
+    return result;
+  } catch (error) {
+    console.error(`[GMAIL] Failed to send email to ${recipient}:`, error.message);
+    throw error;
+  }
 }
+

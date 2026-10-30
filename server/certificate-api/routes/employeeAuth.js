@@ -115,9 +115,11 @@ function normalizeEmail(email) {
 // =====================================================
 
 function isCompanyEmail(email) {
-  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@esparksit\.com$/i.test(
-    email
-  );
+  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@esparksit\.com$/i.test(email);
+}
+
+function isGmail(email) {
+  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@gmail\.com$/i.test(email);
 }
 
 // =====================================================
@@ -378,21 +380,22 @@ router.post(
         });
       }
 
-      // COMPANY EMAIL
-      if (!isCompanyEmail(email)) {
-        return res.status(403).json({
-          message:
-            "Only eSparks IT Solutions company email addresses are allowed.",
-        });
-      }
+    // COMPANY EMAIL + GMAIL
 
-      // PASSWORD
-      if (!validPassword(password)) {
-        return res.status(400).json({
-          message:
-            "Password must be at least 10 characters and no more than 72 UTF-8 bytes.",
-        });
-      }
+if (!isCompanyEmail(email) && !isGmail(email)) {
+  return res.status(403).json({
+    message:
+      "Only eSparks IT Solutions company email addresses or Gmail addresses are allowed.",
+  });
+}
+
+// PASSWORD
+if (!validPassword(password)) {
+  return res.status(400).json({
+    message:
+      "Password must be at least 10 characters and no more than 72 UTF-8 bytes.",
+  });
+}
 
       // HASH
       const passwordHash =

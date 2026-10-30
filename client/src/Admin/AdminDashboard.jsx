@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ShieldCheck,
+
   Award,
   Users,
   FilePlus2,
@@ -28,6 +28,7 @@ import {
   markAdminNotificationAsRead,
   markAllAdminNotificationsAsRead,
 } from "../services/api";
+import brandLogo from "../assets/brand.png";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -300,7 +301,7 @@ export default function AdminDashboard() {
       <main className="admin-loading">
         <div className="admin-loader">
           <div className="admin-loader-ring" />
-          <ShieldCheck size={28} />
+     <img src={brandLogo} alt="eSparks IT Solutions" />
         </div>
 
         <p>
@@ -335,7 +336,7 @@ export default function AdminDashboard() {
             className="admin-brand"
           >
             <div className="admin-brand-logo">
-              <ShieldCheck size={24} />
+          <img  src={brandLogo} alt="eSparks IT Solutions" />
             </div>
 
             <div>
@@ -678,7 +679,7 @@ export default function AdminDashboard() {
             <div className="hero-ring hero-ring-two" />
 
             <div className="hero-shield">
-              <ShieldCheck size={58} />
+              <img src={brandLogo} alt="eSparks IT Solutions" />
             </div>
 
             <div className="hero-floating-card hero-card-one">
@@ -1045,9 +1046,9 @@ export default function AdminDashboard() {
 
           <div>
 
-            <ShieldCheck size={17} />
+            <img src={brandLogo} alt="eSparks IT Solutions" />
 
-            Certificate Management System
+           Esparks Certificate Management System
 
           </div>
 

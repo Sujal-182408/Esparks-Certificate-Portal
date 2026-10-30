@@ -2,7 +2,12 @@
 
 
 
-const API_URL = `${(import.meta.env.VITE_API_URL || "https://esparks-certificate-portal-server.vercel.app").replace(/\/+$/, "")}/api`;
+const API_URL = `${(
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:5000"
+    : "https://esparks-certificate-portal-server.vercel.app")
+).replace(/\/+$/, "")}/api`;
 
 
 /* =========================================================
