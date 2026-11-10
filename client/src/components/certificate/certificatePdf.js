@@ -33,7 +33,9 @@ const CERT_FONTS = [
   '400 24px "Montserrat"',
   '600 24px "Montserrat"',
   '700 24px "Montserrat"',
-  '900 46px "Roboto Slab"',
+  '900 50px "Rokkitt"',
+  '700 19px "Open Sans"',
+  '400 14px "Open Sans"',
   '400 74px "Mrs Saint Delafield"',
 ];
 

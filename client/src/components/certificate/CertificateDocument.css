@@ -128,30 +128,36 @@
 
 .cert-iso-globe svg {
   display: block;
-  width: 74px;
+  width: 72px;
   height: auto;
-  margin-bottom: -3px; /* the dome sits right on top of the lettering */
+  margin-bottom: -2px; /* the dome sits right on top of the lettering */
 }
 
-/* Heavy slab serif, matched to the reference mark */
+/* Rokkitt Black: wide, heavy slab serif — the closest match to the
+   reference "ISO" (compared side by side with 12 candidate fonts). */
 .cert-iso-globe span {
-  font-family: "Roboto Slab", "Rockwell", serif;
-  font-size: 46px;
+  font-family: "Rokkitt", "Rockwell", serif;
+  font-size: 50px;
   font-weight: 900;
-  line-height: 1;
-  color: #0f1f4d;
-  letter-spacing: 0.01em;
+  line-height: 0.95;
+  color: #13235e;
+}
+
+/* Open Sans: matches the reference caption lettering */
+.cert-iso strong,
+.cert-iso small {
+  font-family: "Open Sans", Arial, sans-serif;
 }
 
 .cert-iso strong {
   margin-top: 4px;
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--cert-navy);
 }
 
 .cert-iso small {
-  font-size: 14px;
+  font-size: 15px;
   color: #3d4d6a;
 }
 
