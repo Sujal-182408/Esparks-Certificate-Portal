@@ -20,7 +20,7 @@ if (!to) {
 try {
   await sendEmail({
     to,
-    subject: "eSparks Certificate Portal — SMTP Test",
+    subject: "Esparks Certificate Portal — SMTP Test",
     text: "SMTP email integration is working.",
   });
   console.log("SMTP OK — test email sent.");

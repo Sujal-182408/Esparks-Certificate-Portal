@@ -1,7 +1,7 @@
 {
   "name": "certificate-api",
   "version": "1.0.0",
-  "description": "eSparks certificate portal API (Express + PostgreSQL)",
+  "description": "Esparks certificate portal API (Express + PostgreSQL)",
   "type": "module",
   "main": "server.js",
   "scripts": {

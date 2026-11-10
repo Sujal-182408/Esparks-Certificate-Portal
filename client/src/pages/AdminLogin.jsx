@@ -203,7 +203,7 @@ export default function AdminLogin() {
               </h1>
 
               <p className="mx-auto mt-3 max-w-sm text-[13px] leading-6 text-slate-500 sm:text-sm">
-                Secure administrator access to ESPARKS IT SOLUTIONS.
+                Secure administrator access to Esparks IT Solutions Private Limited.
               </p>
 
             </div>
@@ -390,7 +390,7 @@ export default function AdminLogin() {
 
                   <p className="mt-1 text-[10px] leading-5 text-slate-600">
                     Administrator access is restricted to
-                    authorized ESPARKS IT SOLUTIONS accounts.
+                    authorized Esparks IT Solutions Private Limited accounts.
                   </p>
 
                 </div>
@@ -444,7 +444,7 @@ export default function AdminLogin() {
 
             <span className="h-1 w-1 rounded-full bg-cyan-400/60" />
 
-            ESPARKS IT SOLUTIONS Secure Administration
+            Esparks IT Solutions Secure Administration
 
             <span className="h-1 w-1 rounded-full bg-cyan-400/60" />
 

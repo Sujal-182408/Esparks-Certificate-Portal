@@ -297,7 +297,7 @@ export default function ForgotPassword() {
               <div className="h-px flex-1 bg-linear-to-r from-transparent to-white/[0.07]" />
 
               <span className="text-[9px] font-bold uppercase tracking-[1.5px] text-slate-700">
-                ESPARKS IT SOLUTIONS
+                Esparks IT Solutions
               </span>
 
               <div className="h-px flex-1 bg-linear-to-l from-transparent to-white/[0.07]" />
@@ -316,7 +316,7 @@ export default function ForgotPassword() {
           </div>
 
           <p className="mt-2 text-[9px] text-slate-800">
-            © {new Date().getFullYear()} ESPARKS IT SOLUTIONS
+            © {new Date().getFullYear()} Esparks IT Solutions Private Limited
           </p>
         </div>
       </section>

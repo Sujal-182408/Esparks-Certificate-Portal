@@ -53,7 +53,7 @@ router.get("/:token", verifyLimiter, async (req, res) => {
       success: true,
       valid: false,
       status: "revoked",
-      message: "This certificate was issued by eSparks IT Solutions but has since been revoked and is no longer valid.",
+      message: "This certificate was issued by Esparks IT Solutions Private Limited but has since been revoked and is no longer valid.",
       certificate,
     });
   }

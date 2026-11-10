@@ -27,7 +27,7 @@ export default function AddCertificate() {
 
   const [certificateType, setCertificateType] = useState("");
   const [courseName, setCourseName] = useState("");
-  const [issuerName, setIssuerName] = useState("eSparks IT Solutions");
+  const [issuerName, setIssuerName] = useState("Esparks IT Solutions Private Limited");
   const [issueDate, setIssueDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -375,7 +375,7 @@ export default function AddCertificate() {
                 value={issuerName}
                 onChange={(event) => setIssuerName(event.target.value)}
                 disabled={saving}
-                placeholder="eSparks IT Solutions"
+                placeholder="Esparks IT Solutions Private Limited"
                 autoComplete="organization"
                 required
               />

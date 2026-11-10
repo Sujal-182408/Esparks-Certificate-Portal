@@ -27,7 +27,7 @@ import {
 const router = express.Router();
 router.use(requireAdmin);
 
-const DEFAULT_ISSUER = "eSparks IT Solutions";
+const DEFAULT_ISSUER = "Esparks IT Solutions Private Limited";
 const DEFAULT_REVOKE_REASON = "Certificate revoked by administrator.";
 
 router.get("/", async (req, res) => {

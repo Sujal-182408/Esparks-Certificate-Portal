@@ -520,7 +520,7 @@ const navigate = useNavigate();
 
         <footer className="reports-footer">
           <span><Activity size={14} /> Analytics generated from portal records</span>
-          <span>eSparks IT Solutions</span>
+          <span>Esparks IT Solutions Private Limited</span>
         </footer>
       </div>
     </main>

@@ -228,7 +228,7 @@ export default function Register() {
 
               <p className="mx-auto mt-3 max-w-sm text-[13px] leading-6 text-slate-500 sm:text-sm">
 
-                Create your secure ESPARKS IT SOLUTIONS
+                Create your secure Esparks IT Solutions
                 employee account.
 
               </p>

@@ -16,7 +16,10 @@
 import { CLIENT_URL } from "../config/env.js";
 import { escapeHtml } from "../utils/html.js";
 
-const COMPANY = "eSparks IT Solutions";
+// Official company name (signatures, footers) and short brand (subjects).
+// Always "Esparks" — capital E, small s.
+const COMPANY = "Esparks IT Solutions Private Limited";
+const BRAND = "Esparks";
 
 // ------------------------------------------------------------
 // Shared layout & building blocks
@@ -27,7 +30,7 @@ function layout({ heading, headingColor = "#67e8f9", bodyHtml }) {
   return `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033;line-height:1.6">
   <div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff">
     <h2 style="margin:0;color:${headingColor}">${escapeHtml(heading)}</h2>
-    <p style="margin:6px 0 0">${COMPANY} Certificate Portal</p>
+    <p style="margin:6px 0 0">${BRAND} Certificate Portal</p>
   </div>
   <div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px">
     ${bodyHtml}
@@ -81,7 +84,7 @@ export function certificateIssuedEmail({ employeeName, courseName, certificateNo
   const url = verificationToken ? links.certificate(verificationToken) : links.employeeDashboard();
 
   return {
-    subject: `Your ${COMPANY} Certificate Has Been Issued`,
+    subject: `Your ${BRAND} Certificate Has Been Issued`,
     text:
       `Hello ${name},\n\nYour certificate request for "${course}" has been approved and your certificate has been issued.\n\n` +
       `Certificate number: ${certificateNo || "See your employee portal"}\n\nView your certificate: ${url}${signature}`,
@@ -101,7 +104,7 @@ export function requestRejectedEmail({ employeeName, courseName, reason }) {
   const why = reason || "Please contact the administrator for more information.";
 
   return {
-    subject: `Update on Your ${COMPANY} Certificate Request`,
+    subject: `Update on Your ${BRAND} Certificate Request`,
     text:
       `Hello ${name},\n\nYour certificate request for "${course}" has been rejected.\n\nReason: ${why}\n\n` +
       `If you have questions, please contact the administrator.${signature}`,
@@ -156,7 +159,7 @@ export function accountStatusEmployeeEmail({ employeeName, isActive, changedBy }
     : "Your login access has been suspended. Please contact the administrator.";
 
   return {
-    subject: `Your ${COMPANY} account has been ${status}`,
+    subject: `Your ${BRAND} account has been ${status}`,
     text: `Hello ${employeeName || "Employee"},\n\nYour Certificate Portal account has been ${status}.\n\nUpdated by: ${changedBy}\n\n${next}${signature}`,
     html: layout({
       heading: `Account ${isActive ? "Activated" : "Deactivated"}`,
@@ -251,7 +254,7 @@ export function deleteOtpEmail({ certificate, otp, minutes }) {
 export function passwordResetEmail({ name, resetUrl, minutes, isAdmin }) {
   const who = isAdmin ? "administrator password" : "password";
   return {
-    subject: `${COMPANY} Certificate Portal — ${isAdmin ? "Admin " : ""}Password Reset`,
+    subject: `${BRAND} Certificate Portal — ${isAdmin ? "Admin " : ""}Password Reset`,
     text:
       `Hello ${name || ""},\n\nWe received a request to reset your ${who}.\n\nReset your password here:\n${resetUrl}\n\n` +
       `This link expires in ${minutes} minutes.\n\nIf you did not request this, you can safely ignore this email.${signature}`,

@@ -62,7 +62,7 @@ export default function Home() {
               text-cyan-300
             "
           >
-              <img className="w-7 h-7 object-contain" src={brandLogo} alt="eSparks IT Solutions" />
+              <img className="w-7 h-7 object-contain" src={brandLogo} alt="Esparks IT Solutions Private Limited" />
             <span>Secure Certificate Verification</span>
           </div>
 
@@ -108,7 +108,7 @@ export default function Home() {
               sm:text-lg
             "
           >
-            ESPARKS IT SOLUTIONS provides a secure and reliable way to verify certificates
+            Esparks IT Solutions Private Limited provides a secure and reliable way to verify certificates
             using unique verification tokens and QR codes.
           </p>
 
@@ -262,7 +262,7 @@ export default function Home() {
   <img
     className="h-12 w-12 object-contain"
     src={brandLogo}
-    alt="eSparks IT Solutions"
+    alt="Esparks IT Solutions Private Limited"
   />
 </div>
 
@@ -317,8 +317,8 @@ export default function Home() {
             </h3>
 
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Verify certificate information directly against the ESPARKS IT SOLUTIONS
-              system.
+              Verify certificate information directly against the official
+              Esparks IT Solutions Private Limited records.
             </p>
           </div>
         </section>

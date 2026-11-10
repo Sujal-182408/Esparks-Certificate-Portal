@@ -57,7 +57,7 @@ router.post("/register", registerLimiter, async (req, res) => {
   if (!hasAllowedDomain(email)) {
     return res.status(403).json({
       success: false,
-      message: "Only eSparks IT Solutions company email addresses or Gmail addresses are allowed.",
+      message: "Only Esparks IT Solutions Private Limited company email addresses or Gmail addresses are allowed.",
     });
   }
   if (!isValidPassword(password)) {

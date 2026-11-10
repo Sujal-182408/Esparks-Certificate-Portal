@@ -225,7 +225,7 @@ function EmptyCertificates({
       <div className="ed-empty-glow" />
 
       <div className="ed-empty-icon">
-       <img src={brandLogo} alt="eSparks IT Solutions" />
+       <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
       </div>
 
       <div className="ed-empty-content">
@@ -823,7 +823,7 @@ export default function EmployeeDashboard() {
 
             <div className="ed-brand-icon">
               <div className="ed-brand-inner">
-                <img src={brandLogo} alt="eSparks IT Solutions" />
+                <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
               </div>
             </div>
 
@@ -1541,11 +1541,11 @@ export default function EmployeeDashboard() {
           <div className="ed-footer-left">
 
             <div className="ed-footer-icon">
-            <img src={brandLogo} alt="Esparks IT Solution" />
+            <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
             </div>
 
             <span>
-              ESPARKS IT SOLUTIONS Secure Credential Network
+              Esparks IT Solutions Secure Credential Network
             </span>
 
           </div>
