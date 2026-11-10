@@ -95,10 +95,6 @@ function GoldGradients() {
         <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
         <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
       </linearGradient>
-      <linearGradient id="cert-leaf" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#d8e0e9" />
-        <stop offset="1" stopColor="#c9d3de" />
-      </linearGradient>
       <radialGradient id="cert-paper" cx="0.5" cy="0.45" r="0.8">
         <stop offset="0" stopColor="#ffffff" />
         <stop offset="1" stopColor="#f6f8fb" />
@@ -261,6 +257,7 @@ const STEM_SAMPLES = STEM_SEGMENTS.flatMap(([a, b, c, d]) =>
   }),
 );
 
+/** Closest stem sample to (x, y). */
 function nearestStemPoint([x, y]) {
   let best = STEM_SAMPLES[0];
   let bestDistance = Infinity;
@@ -271,62 +268,118 @@ function nearestStemPoint([x, y]) {
       best = point;
     }
   }
-  return best;
+  return { point: best };
 }
 
-// A leaf 2 units long, centred on (0, 0), traced from the reference:
-// the BASE (x = -1) narrows to a point that flows into the stem, the leaf
-// is widest just past the middle, and the sides curve in to a long, fine
-// TIP (x = +1). Max width ≈ 0.86 units.
-const LEAF_UNIT =
-  "M -1 0 C -0.62 -0.2, -0.22 -0.45, 0.22 -0.43 C 0.6 -0.4, 0.86 -0.16, 1 0 " +
-  "C 0.86 0.16, 0.6 0.4, 0.22 0.43 C -0.22 0.45, -0.62 0.2, -1 0 Z";
-const LEAF_UNIT_WIDTH = 0.86;
-
 // Size correction: pixel moments assume a rectangle; for a pointed,
-// lens-shaped leaf the true length is ~1.25× and width ~1.15× larger
+// lens-shaped leaf the true length is ~1.25× and width ~1.1× larger
 // (checked by overlaying the result on the reference).
 const LEAF_LENGTH_FACTOR = 1.25;
-const LEAF_WIDTH_FACTOR = 1.15;
+const LEAF_WIDTH_FACTOR = 1.1;
 
-// In the reference every leaf is ATTACHED to the stem by a short
-// leaf-stalk (petiole): its pointed base runs into the stem. So for each
-// measured leaf we find the closest point on the stem, keep the leaf's
-// angle, and move the leaf so its base sits PETIOLE_LENGTH px out from
-// the stem; a tapered stalk then joins the two.
-const PETIOLE_LENGTH = 7;
+// ---- Each leaf + its stalk is ONE continuous shape ----
+// The BLADE stays exactly where it was measured in the reference (that
+// layout was already correct). Measured blade bases sit 1–10 px from the
+// stem — in the reference that gap is a short leaf-stalk. So each leaf is
+// generated as one outline that:
+//  * starts ON the stem, as wide as the stem (seamless joint)
+//  * runs as a thin stalk to the measured blade base, curving smoothly
+//    into the leaf's direction
+//  * swells into an almond blade (widest near the middle) and ends in a
+//    sharp tip
+const STEM_HALF_WIDTH = 2.9;
+const STALK_HALF_WIDTH = 1.4;
+const LEAF_SAMPLES = 48; // points per side of the outline
 
-const LAUREL_PARTS = LAUREL_LEAVES.map(([x, y, angle, length, width]) => {
-  const half = (length * LEAF_LENGTH_FACTOR) / 2;
+function leafOutline([x, y, angle, length, width]) {
+  const bladeLength = length * LEAF_LENGTH_FACTOR;
+  const bladeHalfWidth = (width * LEAF_WIDTH_FACTOR) / 2;
   const rad = (angle * Math.PI) / 180;
   const dir = [Math.cos(rad), Math.sin(rad)];
-  const base = [x - half * dir[0], y - half * dir[1]]; // where the leaf would start
-  const [sx, sy] = nearestStemPoint(base);
-  const leafBase = [sx + PETIOLE_LENGTH * dir[0], sy + PETIOLE_LENGTH * dir[1]];
-  const cx = leafBase[0] + half * dir[0];
-  const cy = leafBase[1] + half * dir[1];
-  // stalk overlaps 6 px into the leaf so there is no visible seam
-  const end = [leafBase[0] + 6 * dir[0], leafBase[1] + 6 * dir[1]];
-  return {
-    leaf: `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${angle}) scale(${half.toFixed(2)} ${((width * LEAF_WIDTH_FACTOR) / LEAF_UNIT_WIDTH).toFixed(2)})`,
-    petiole: `M ${sx.toFixed(1)} ${sy.toFixed(1)} L ${end[0].toFixed(1)} ${end[1].toFixed(1)}`,
-  };
-});
 
-/** Large faint laurel branch on the right side (measured colours: #ced7e2–#d3dbe5). */
+  const base = [x - (bladeLength / 2) * dir[0], y - (bladeLength / 2) * dir[1]];
+  const tip = [x + (bladeLength / 2) * dir[0], y + (bladeLength / 2) * dir[1]];
+  const { point: start } = nearestStemPoint(base);
+  const stalkLength = Math.hypot(base[0] - start[0], base[1] - start[1]);
+
+  // Midrib: cubic Bézier stem -> base -> tip. Control points make it head
+  // towards the base first, then leave the base along the leaf direction,
+  // so the stalk bends smoothly into the blade (no kink).
+  const c1 = [start[0] + (base[0] - start[0]) * 0.8, start[1] + (base[1] - start[1]) * 0.8];
+  const c2 = [base[0] + dir[0] * bladeLength * 0.3, base[1] + dir[1] * bladeLength * 0.3];
+  const halfWidthAt = (u, stalkShare) => {
+    if (u <= stalkShare) {
+      const k = stalkShare === 0 ? 1 : u / stalkShare;
+      return STEM_HALF_WIDTH + (STALK_HALF_WIDTH - STEM_HALF_WIDTH) * k; // stem width -> stalk width
+    }
+    const v = (u - stalkShare) / (1 - stalkShare); // 0 at blade base, 1 at tip
+    // Almond profile: narrow base, widest near the middle, sides still
+    // curving outward into a sharp tip (power slightly < 1 = fuller).
+    const swell = Math.sin(Math.PI * v ** 0.92) ** 0.9;
+    return bladeHalfWidth * swell + STALK_HALF_WIDTH * (1 - v) ** 4;
+  };
+
+  // A Bézier's parameter does NOT move at constant speed (it crawls near
+  // clustered control points), so we first sample the curve densely and
+  // measure real distance along it. Widths are then applied by DISTANCE,
+  // which puts the widest part of the blade where it belongs.
+  const dense = Array.from({ length: 121 }, (_, k) => {
+    const t = k / 120;
+    const m = 1 - t;
+    return [
+      m ** 3 * start[0] + 3 * m * m * t * c1[0] + 3 * m * t * t * c2[0] + t ** 3 * tip[0],
+      m ** 3 * start[1] + 3 * m * m * t * c1[1] + 3 * m * t * t * c2[1] + t ** 3 * tip[1],
+    ];
+  });
+  const distance = [0];
+  for (let k = 1; k < dense.length; k += 1) {
+    distance.push(distance[k - 1] + Math.hypot(dense[k][0] - dense[k - 1][0], dense[k][1] - dense[k - 1][1]));
+  }
+  const total = distance[distance.length - 1];
+
+  /** Point and unit tangent at distance d along the midrib. */
+  const at = (d) => {
+    let k = 1;
+    while (k < distance.length - 1 && distance[k] < d) k += 1;
+    const span = distance[k] - distance[k - 1] || 1;
+    const f = Math.min(1, Math.max(0, (d - distance[k - 1]) / span));
+    const a = dense[k - 1];
+    const b = dense[k];
+    const tl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, tx: (b[0] - a[0]) / tl, ty: (b[1] - a[1]) / tl };
+  };
+
+  const arcStalkShare = Math.min(stalkLength, total) / total;
+  const left = [];
+  const right = [];
+  for (let k = 0; k <= LEAF_SAMPLES; k += 1) {
+    const u = k / LEAF_SAMPLES;
+    const { x: px, y: py, tx, ty } = at(u * total);
+    const half = u === 1 ? 0 : halfWidthAt(u, arcStalkShare);
+    left.push(`${(px - ty * half).toFixed(1)},${(py + tx * half).toFixed(1)}`);
+    right.push(`${(px + ty * half).toFixed(1)},${(py - tx * half).toFixed(1)}`);
+  }
+  return `M ${left.join(" L ")} L ${right.reverse().join(" L ")} Z`;
+}
+
+const LAUREL_LEAF_PATHS = LAUREL_LEAVES.map(leafOutline);
+
+// Measured from the reference (leaves #ced7e2–#d3dbe5).
+const LAUREL_COLOUR = "#d0d9e3";
+
+/** Large faint laurel branch on the right side. */
 function Laurel() {
-  // No outlines: the reference leaves are EMBOSSED — a soft shadow on the
-  // lower-right edges and a light rim on the upper-left (see #cert-emboss).
+  // One flat colour for leaves AND stem, so where they overlap they merge
+  // into a single seamless shape. The emboss filter then shades the
+  // outline of the whole branch (shadow down-right, light rim up-left),
+  // like the reference.
   return (
-    <g filter="url(#cert-emboss)">
-      <path d={LAUREL_STEM} fill="none" stroke="#ccd5df" strokeWidth="5.5" strokeLinecap="round" />
-      {/* leaf-stalks first, so the leaves sit on top of them */}
-      {LAUREL_PARTS.map(({ petiole }) => (
-        <path key={petiole} d={petiole} stroke="#ccd5df" strokeWidth="3.6" strokeLinecap="round" />
+    <g filter="url(#cert-emboss)" fill={LAUREL_COLOUR}>
+      {LAUREL_LEAF_PATHS.map((d) => (
+        <path key={d.slice(0, 24)} d={d} />
       ))}
-      {LAUREL_PARTS.map(({ leaf }) => (
-        <path key={leaf} d={LEAF_UNIT} fill="url(#cert-leaf)" transform={leaf} />
-      ))}
+      {/* stem on top: stays one continuous line, as in the reference */}
+      <path d={LAUREL_STEM} fill="none" stroke={LAUREL_COLOUR} strokeWidth={STEM_HALF_WIDTH * 2} strokeLinecap="round" />
     </g>
   );
 }
