@@ -222,10 +222,57 @@ const LAUREL_LEAVES = [
   [1316, 642, -8, 59, 22],
 ];
 
-// Stem: a smooth curve (Catmull-Rom) through the measured leaf bases,
-// starting with the bare tail at the bottom-left.
+// Stem: measured points (bottom tail -> top), joined by a smooth
+// Catmull-Rom curve that passes exactly through every point.
+const STEM_POINTS = [
+  [1201, 679], [1280, 638], [1325, 601], [1361, 555], [1385, 504],
+  [1394, 447], [1386, 388], [1362, 336], [1331, 291], [1306, 268],
+];
+
+/** Catmull-Rom -> cubic Bézier control points for segment i. */
+function stemSegment(i) {
+  const p0 = STEM_POINTS[Math.max(i - 1, 0)];
+  const p1 = STEM_POINTS[i];
+  const p2 = STEM_POINTS[i + 1];
+  const p3 = STEM_POINTS[Math.min(i + 2, STEM_POINTS.length - 1)];
+  return [
+    p1,
+    [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6],
+    [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6],
+    p2,
+  ];
+}
+
+const STEM_SEGMENTS = STEM_POINTS.slice(0, -1).map((_, i) => stemSegment(i));
+
 const LAUREL_STEM =
-  "M 1201 679 C 1214 672, 1259 651, 1280 638 C 1301 625, 1312 615, 1325 601 C 1338 587, 1351 571, 1361 555 C 1371 539, 1380 522, 1385 504 C 1390 486, 1394 466, 1394 447 C 1394 428, 1391 406, 1386 388 C 1381 370, 1371 352, 1362 336 C 1353 320, 1340 302, 1331 291 C 1322 280, 1310 272, 1306 268";
+  `M ${STEM_POINTS[0].join(" ")} ` +
+  STEM_SEGMENTS.map(([, c1, c2, p]) => `C ${c1.map((v) => v.toFixed(1)).join(" ")}, ${c2.map((v) => v.toFixed(1)).join(" ")}, ${p.join(" ")}`).join(" ");
+
+// Dense points along the stem (20 per segment) for "nearest point" lookups.
+const STEM_SAMPLES = STEM_SEGMENTS.flatMap(([a, b, c, d]) =>
+  Array.from({ length: 20 }, (_, k) => {
+    const t = k / 20;
+    const u = 1 - t;
+    return [
+      u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0],
+      u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1],
+    ];
+  }),
+);
+
+function nearestStemPoint([x, y]) {
+  let best = STEM_SAMPLES[0];
+  let bestDistance = Infinity;
+  for (const point of STEM_SAMPLES) {
+    const distance = (point[0] - x) ** 2 + (point[1] - y) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = point;
+    }
+  }
+  return best;
+}
 
 // A leaf 2 units long, centred on (0, 0), traced from the reference:
 // the BASE (x = -1) narrows to a point that flows into the stem, the leaf
@@ -242,10 +289,29 @@ const LEAF_UNIT_WIDTH = 0.86;
 const LEAF_LENGTH_FACTOR = 1.25;
 const LEAF_WIDTH_FACTOR = 1.15;
 
-const LEAF_TRANSFORMS = LAUREL_LEAVES.map(
-  ([x, y, angle, length, width]) =>
-    `translate(${x} ${y}) rotate(${angle}) scale(${((length * LEAF_LENGTH_FACTOR) / 2).toFixed(2)} ${((width * LEAF_WIDTH_FACTOR) / LEAF_UNIT_WIDTH).toFixed(2)})`,
-);
+// In the reference every leaf is ATTACHED to the stem by a short
+// leaf-stalk (petiole): its pointed base runs into the stem. So for each
+// measured leaf we find the closest point on the stem, keep the leaf's
+// angle, and move the leaf so its base sits PETIOLE_LENGTH px out from
+// the stem; a tapered stalk then joins the two.
+const PETIOLE_LENGTH = 7;
+
+const LAUREL_PARTS = LAUREL_LEAVES.map(([x, y, angle, length, width]) => {
+  const half = (length * LEAF_LENGTH_FACTOR) / 2;
+  const rad = (angle * Math.PI) / 180;
+  const dir = [Math.cos(rad), Math.sin(rad)];
+  const base = [x - half * dir[0], y - half * dir[1]]; // where the leaf would start
+  const [sx, sy] = nearestStemPoint(base);
+  const leafBase = [sx + PETIOLE_LENGTH * dir[0], sy + PETIOLE_LENGTH * dir[1]];
+  const cx = leafBase[0] + half * dir[0];
+  const cy = leafBase[1] + half * dir[1];
+  // stalk overlaps 6 px into the leaf so there is no visible seam
+  const end = [leafBase[0] + 6 * dir[0], leafBase[1] + 6 * dir[1]];
+  return {
+    leaf: `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${angle}) scale(${half.toFixed(2)} ${((width * LEAF_WIDTH_FACTOR) / LEAF_UNIT_WIDTH).toFixed(2)})`,
+    petiole: `M ${sx.toFixed(1)} ${sy.toFixed(1)} L ${end[0].toFixed(1)} ${end[1].toFixed(1)}`,
+  };
+});
 
 /** Large faint laurel branch on the right side (measured colours: #ced7e2–#d3dbe5). */
 function Laurel() {
@@ -253,9 +319,13 @@ function Laurel() {
   // lower-right edges and a light rim on the upper-left (see #cert-emboss).
   return (
     <g filter="url(#cert-emboss)">
-      <path d={LAUREL_STEM} fill="none" stroke="#ccd5df" strokeWidth="4.5" strokeLinecap="round" />
-      {LEAF_TRANSFORMS.map((transform) => (
-        <path key={transform} d={LEAF_UNIT} fill="url(#cert-leaf)" transform={transform} />
+      <path d={LAUREL_STEM} fill="none" stroke="#ccd5df" strokeWidth="5.5" strokeLinecap="round" />
+      {/* leaf-stalks first, so the leaves sit on top of them */}
+      {LAUREL_PARTS.map(({ petiole }) => (
+        <path key={petiole} d={petiole} stroke="#ccd5df" strokeWidth="3.6" strokeLinecap="round" />
+      ))}
+      {LAUREL_PARTS.map(({ leaf }) => (
+        <path key={leaf} d={LEAF_UNIT} fill="url(#cert-leaf)" transform={leaf} />
       ))}
     </g>
   );
