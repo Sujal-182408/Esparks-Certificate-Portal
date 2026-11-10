@@ -35,6 +35,20 @@ function GoldGradients() {
         <stop offset="0" stopColor="#0a1f45" />
         <stop offset="1" stopColor="#173d7a" />
       </linearGradient>
+      {/* userSpaceOnUse: one gradient across the whole band, so every line fades at the same x */}
+      <linearGradient id="cert-fine" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="640" y2="0">
+        <stop offset="0" stopColor="#cfd7e3" stopOpacity="0.95" />
+        <stop offset="0.55" stopColor="#d6dde8" stopOpacity="0.6" />
+        <stop offset="1" stopColor="#dde3ec" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="cert-sheen" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
+        <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="cert-leaf" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#eef1f5" />
+        <stop offset="1" stopColor="#dde2e9" />
+      </linearGradient>
       <radialGradient id="cert-paper" cx="0.5" cy="0.45" r="0.8">
         <stop offset="0" stopColor="#ffffff" />
         <stop offset="1" stopColor="#f1f4f9" />
@@ -62,18 +76,33 @@ function Corner(props) {
   );
 }
 
-/** Faint flowing lines across the paper. */
-function Waves() {
-  const lower = [560, 585, 610, 635, 660, 685];
-  const upper = [150, 172, 194];
+// ---- Background decoration (matches the approved sample) ----
+// The sample keeps the content area clean. Decoration lives only in the
+// empty margins, so NO line ever passes behind text, the laurel or the QR:
+//   * top-left: a band of very fine silver lines that fades out to the right
+//   * top-left + bottom-left: soft white "satin" sheens
+const FINE_LINES = Array.from({ length: 14 }, (_, i) =>
+  `M 30 ${300 + i * 8} C 200 ${292 + i * 8}, 380 ${214 + i * 5}, 640 ${168 + i * 3}`,
+);
+
+function Decorations() {
   return (
-    <g fill="none" stroke="#e3e9f1" strokeWidth="1.4">
-      {lower.map((y) => (
-        <path key={`l${y}`} d={`M -40 ${y} C 380 ${y - 90}, 760 ${y + 110}, 1540 ${y - 50}`} />
-      ))}
-      {upper.map((y) => (
-        <path key={`u${y}`} d={`M -40 ${y} C 420 ${y + 70}, 900 ${y - 80}, 1540 ${y + 30}`} />
-      ))}
+    <g>
+      {/* soft satin sheens */}
+      <path
+        d="M 30 250 C 260 220, 470 160, 720 118 L 720 136 C 470 190, 260 290, 30 430 Z"
+        fill="url(#cert-sheen)"
+      />
+      <path
+        d="M 30 560 C 110 690, 200 820, 390 976 L 320 976 C 170 850, 90 740, 30 650 Z"
+        fill="url(#cert-sheen)"
+      />
+      {/* fine guilloché lines; the gradient stroke fades them out to the right */}
+      <g fill="none" stroke="url(#cert-fine)" strokeWidth="0.9">
+        {FINE_LINES.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
     </g>
   );
 }
@@ -96,47 +125,66 @@ function bezier(t, p0, p1, p2) {
 }
 
 // ---- Laurel geometry: computed ONCE when the module loads ----
-// (Doing this maths inside the component would repeat it on every render.)
-const LAUREL_CURVE = { p0: [1255, 700], p1: [1440, 470], p2: [1330, 215] };
+// Slender pointed leaves (like the sample), alternating along a curved
+// stem: the right-hand leaf sits slightly higher than the left-hand one.
+const LAUREL_CURVE = { p0: [1265, 705], p1: [1445, 470], p2: [1335, 215] };
+
+// One leaf pointing along +x from (0,0): pointed at both ends.
+const LEAF_PATH = "M 0 0 C 14 -17, 44 -17, 68 0 C 44 17, 14 17, 0 0 Z";
 
 const LAUREL_LEAVES = Array.from({ length: 10 }, (_, index) => {
   const i = index + 1;
-  const { x, y, angle } = bezier(i / 11, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
-  const size = 1 - i * 0.035; // leaves get slightly smaller towards the tip
-  return [-38, 38].map((tilt) => ({
-    key: `${i}${tilt}`,
-    x,
-    y,
-    rx: 34 * size,
-    ry: 12 * size,
-    transform: `rotate(${angle + tilt} ${x} ${y}) translate(${30 * size} 0)`,
-  }));
+  const size = 1.2 - i * 0.04; // leaves get smaller towards the tip
+  return [
+    { tilt: -40, t: i / 11.5 },
+    { tilt: 40, t: i / 11.5 + 0.035 },
+  ].map(({ tilt, t }) => {
+    const { x, y, angle } = bezier(t, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
+    return {
+      key: `${i}${tilt}`,
+      transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(angle + tilt).toFixed(1)}) scale(${size.toFixed(3)})`,
+    };
+  });
 }).flat();
 
 /** Large faint laurel branch on the right side. */
 function Laurel() {
   const { p0, p1, p2 } = LAUREL_CURVE;
   return (
-    <g fill="#e6ebf2">
-      <path d={`M ${p0[0]} ${p0[1]} Q ${p1[0]} ${p1[1]} ${p2[0]} ${p2[1]}`} fill="none" stroke="#e6ebf2" strokeWidth="5" />
-      {LAUREL_LEAVES.map(({ key, x, y, rx, ry, transform }) => (
-        <ellipse key={key} cx={x} cy={y} rx={rx} ry={ry} transform={transform} />
+    <g>
+      <path
+        d={`M ${p0[0]} ${p0[1]} Q ${p1[0]} ${p1[1]} ${p2[0]} ${p2[1]}`}
+        fill="none"
+        stroke="#e1e6ed"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      {LAUREL_LEAVES.map(({ key, transform }) => (
+        <g key={key} transform={transform}>
+          <path d={LEAF_PATH} fill="url(#cert-leaf)" />
+          {/* pale midrib for a subtle embossed look */}
+          <line x1="8" y1="0" x2="58" y2="0" stroke="#ffffff" strokeOpacity="0.65" strokeWidth="1.1" />
+        </g>
       ))}
-      <ellipse cx={p2[0]} cy={p2[1] - 22} rx="12" ry="30" transform={`rotate(-12 ${p2[0]} ${p2[1]})`} />
+      {/* tip leaf pointing up */}
+      <g transform={`translate(${p2[0]} ${p2[1]}) rotate(-100) scale(0.8)`}>
+        <path d={LEAF_PATH} fill="url(#cert-leaf)" />
+        <line x1="8" y1="0" x2="58" y2="0" stroke="#ffffff" strokeOpacity="0.65" strokeWidth="1.1" />
+      </g>
     </g>
   );
 }
 
-/** Full-size background: paper, waves, laurel, border and corners. */
+/** Full-size background: paper, margin decorations, laurel, border and corners. */
 export const CertificateBackground = memo(function CertificateBackground() {
   return (
     <svg className="cert-layer" viewBox="0 0 1500 1000" width="1500" height="1000" aria-hidden="true">
       <GoldGradients />
       <rect width="1500" height="1000" fill="url(#cert-paper)" />
-      <Waves />
+      <Decorations />
       <Laurel />
-      <rect x="24" y="24" width="1452" height="952" rx="10" fill="none" stroke="url(#cert-gold)" strokeWidth="3" />
-      <rect x="36" y="36" width="1428" height="928" rx="6" fill="none" stroke="#ecdcae" strokeWidth="1" />
+      {/* single gold border with rounded corners (as in the sample) */}
+      <rect x="24" y="24" width="1452" height="952" rx="24" fill="none" stroke="url(#cert-gold)" strokeWidth="3.5" />
       <Corner />
       <Corner transform="rotate(180 750 500)" />
     </svg>

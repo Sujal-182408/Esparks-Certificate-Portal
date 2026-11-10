@@ -307,7 +307,7 @@
   width: 100%;
   height: 2px;
   margin: 4px 0 8px;
-  background: #24324d;
+  background: var(--cert-gold); /* gold, as in the sample */
 }
 
 .cert-signature strong {
