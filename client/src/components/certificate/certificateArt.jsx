@@ -36,18 +36,28 @@ function GoldGradients() {
         <stop offset="1" stopColor="#173d7a" />
       </linearGradient>
       {/* userSpaceOnUse: one gradient across the whole band, so every line fades at the same x */}
-      <linearGradient id="cert-fine" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="640" y2="0">
-        <stop offset="0" stopColor="#cfd7e3" stopOpacity="0.95" />
-        <stop offset="0.55" stopColor="#d6dde8" stopOpacity="0.6" />
+      <linearGradient id="cert-fine" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="780" y2="0">
+        <stop offset="0" stopColor="#cdd5e1" stopOpacity="0.9" />
+        <stop offset="0.6" stopColor="#d3dae5" stopOpacity="0.7" />
         <stop offset="1" stopColor="#dde3ec" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="cert-fine-right" gradientUnits="userSpaceOnUse" x1="930" y1="0" x2="1476" y2="0">
+        <stop offset="0" stopColor="#cdd5e1" stopOpacity="0" />
+        <stop offset="0.35" stopColor="#cdd5e1" stopOpacity="0.85" />
+        <stop offset="1" stopColor="#d3dae5" stopOpacity="0.7" />
+      </linearGradient>
+      <linearGradient id="cert-glow" gradientUnits="userSpaceOnUse" x1="900" y1="0" x2="1476" y2="0">
+        <stop offset="0" stopColor="#e6edf7" stopOpacity="0" />
+        <stop offset="0.5" stopColor="#e6edf7" stopOpacity="0.9" />
+        <stop offset="1" stopColor="#eef2f8" stopOpacity="0.6" />
       </linearGradient>
       <linearGradient id="cert-sheen" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
         <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
       </linearGradient>
       <linearGradient id="cert-leaf" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#eef1f5" />
-        <stop offset="1" stopColor="#dde2e9" />
+        <stop offset="0" stopColor="#ebeef2" />
+        <stop offset="1" stopColor="#d9dee5" />
       </linearGradient>
       <radialGradient id="cert-paper" cx="0.5" cy="0.45" r="0.8">
         <stop offset="0" stopColor="#ffffff" />
@@ -77,31 +87,46 @@ function Corner(props) {
 }
 
 // ---- Background decoration (matches the approved sample) ----
-// The sample keeps the content area clean. Decoration lives only in the
-// empty margins, so NO line ever passes behind text, the laurel or the QR:
-//   * top-left: a band of very fine silver lines that fades out to the right
-//   * top-left + bottom-left: soft white "satin" sheens
-const FINE_LINES = Array.from({ length: 14 }, (_, i) =>
-  `M 30 ${300 + i * 8} C 200 ${292 + i * 8}, 380 ${214 + i * 5}, 640 ${168 + i * 3}`,
-);
+// Two "fans" of hair-thin silver lines, like guilloché on banknotes:
+//   * top-left: lines spread wide at the left edge and converge as they
+//     sweep up towards the header
+//   * right: lines start together under the paragraph and spread out
+//     towards the right edge, passing below the laurel and above the QR
+// Each fan fades out with a gradient stroke, and soft white/blue sheens
+// sit along them. Geometry is computed once at module load.
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const TOP_LEFT_FAN = Array.from({ length: 30 }, (_, i) => {
+  const t = i / 29;
+  const y0 = lerp(175, 420, t); // spread at the left edge
+  return `M 30 ${y0.toFixed(1)} C 230 ${(y0 - 25).toFixed(1)}, 430 ${lerp(165, 215, t).toFixed(1)}, 780 ${lerp(150, 172, t).toFixed(1)}`;
+});
+
+const RIGHT_FAN = Array.from({ length: 24 }, (_, i) => {
+  const t = i / 23;
+  return `M 930 ${lerp(782, 796, t).toFixed(1)} C 1130 ${lerp(760, 790, t).toFixed(1)}, 1300 ${lerp(640, 720, t).toFixed(1)}, 1476 ${lerp(430, 610, t).toFixed(1)}`;
+});
 
 function Decorations() {
   return (
     <g>
-      {/* soft satin sheens */}
-      <path
-        d="M 30 250 C 260 220, 470 160, 720 118 L 720 136 C 470 190, 260 290, 30 430 Z"
-        fill="url(#cert-sheen)"
-      />
-      <path
-        d="M 30 560 C 110 690, 200 820, 390 976 L 320 976 C 170 850, 90 740, 30 650 Z"
-        fill="url(#cert-sheen)"
-      />
-      {/* fine guilloché lines; the gradient stroke fades them out to the right */}
-      <g fill="none" stroke="url(#cert-fine)" strokeWidth="0.9">
-        {FINE_LINES.map((d) => (
-          <path key={d} d={d} />
-        ))}
+      {/* soft sheens */}
+      <path d="M 30 210 C 260 180, 480 140, 760 120 L 760 150 C 480 190, 260 300, 30 440 Z" fill="url(#cert-sheen)" />
+      <path d="M 30 560 C 110 690, 200 820, 390 976 L 320 976 C 170 850, 90 740, 30 650 Z" fill="url(#cert-sheen)" />
+      <path d="M 900 800 C 1120 770, 1290 660, 1476 470 L 1476 560 C 1300 700, 1130 790, 900 806 Z" fill="url(#cert-glow)" />
+
+      {/* hair-thin lines; gradient strokes make each fan fade out */}
+      <g fill="none" strokeWidth="0.75">
+        <g stroke="url(#cert-fine)">
+          {TOP_LEFT_FAN.map((d) => (
+            <path key={d} d={d} />
+          ))}
+        </g>
+        <g stroke="url(#cert-fine-right)">
+          {RIGHT_FAN.map((d) => (
+            <path key={d} d={d} />
+          ))}
+        </g>
       </g>
     </g>
   );
@@ -125,27 +150,46 @@ function bezier(t, p0, p1, p2) {
 }
 
 // ---- Laurel geometry: computed ONCE when the module loads ----
-// Slender pointed leaves (like the sample), alternating along a curved
-// stem: the right-hand leaf sits slightly higher than the left-hand one.
-const LAUREL_CURVE = { p0: [1265, 705], p1: [1445, 470], p2: [1335, 215] };
+// The branch is a rounded arc (like the sample): a thin stem tail at the
+// bottom-left, bulging out to the right, curving back left at the top.
+// p1 is a Bézier control point — it pulls the curve but is not on it.
+const LAUREL_CURVE = { p0: [1178, 694], p1: [1520, 452], p2: [1270, 228] };
 
-// One leaf pointing along +x from (0,0): pointed at both ends.
-const LEAF_PATH = "M 0 0 C 14 -17, 44 -17, 68 0 C 44 17, 14 17, 0 0 Z";
+// One full leaf pointing along +x from (0,0): broad in the middle,
+// pointed at both ends (about 2 : 1 length to width).
+const LEAF_PATH = "M 0 0 C 14 -21, 46 -21, 72 0 C 46 21, 14 21, 0 0 Z";
 
-const LAUREL_LEAVES = Array.from({ length: 10 }, (_, index) => {
-  const i = index + 1;
-  const size = 1.2 - i * 0.04; // leaves get smaller towards the tip
+// Leaves alternate sides and are largest in the middle of the branch.
+const LAUREL_LEAVES = Array.from({ length: 11 }, (_, index) => {
+  const base = 0.16 + index * 0.072; // leave the bottom of the stem bare (the "tail")
+  const size = 0.62 + 0.42 * Math.sin(Math.PI * Math.min(1, (base - 0.1) / 0.85));
   return [
-    { tilt: -40, t: i / 11.5 },
-    { tilt: 40, t: i / 11.5 + 0.035 },
+    { tilt: -36, t: base },
+    { tilt: 36, t: base + 0.032 },
   ].map(({ tilt, t }) => {
     const { x, y, angle } = bezier(t, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
     return {
-      key: `${i}${tilt}`,
+      key: `${index}${tilt}`,
       transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(angle + tilt).toFixed(1)}) scale(${size.toFixed(3)})`,
     };
   });
 }).flat();
+
+// The tip leaf continues the stem's direction at the top.
+const LAUREL_TIP = (() => {
+  const { x, y, angle } = bezier(1, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
+  return `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${angle.toFixed(1)}) scale(0.7)`;
+})();
+
+function Leaf({ transform }) {
+  return (
+    <g transform={transform}>
+      <path d={LEAF_PATH} fill="url(#cert-leaf)" />
+      {/* pale midrib for a subtle embossed look */}
+      <line x1="8" y1="0" x2="60" y2="0" stroke="#ffffff" strokeOpacity="0.7" strokeWidth="1.2" />
+    </g>
+  );
+}
 
 /** Large faint laurel branch on the right side. */
 function Laurel() {
@@ -155,22 +199,14 @@ function Laurel() {
       <path
         d={`M ${p0[0]} ${p0[1]} Q ${p1[0]} ${p1[1]} ${p2[0]} ${p2[1]}`}
         fill="none"
-        stroke="#e1e6ed"
-        strokeWidth="4"
+        stroke="#dfe4ea"
+        strokeWidth="3.5"
         strokeLinecap="round"
       />
       {LAUREL_LEAVES.map(({ key, transform }) => (
-        <g key={key} transform={transform}>
-          <path d={LEAF_PATH} fill="url(#cert-leaf)" />
-          {/* pale midrib for a subtle embossed look */}
-          <line x1="8" y1="0" x2="58" y2="0" stroke="#ffffff" strokeOpacity="0.65" strokeWidth="1.1" />
-        </g>
+        <Leaf key={key} transform={transform} />
       ))}
-      {/* tip leaf pointing up */}
-      <g transform={`translate(${p2[0]} ${p2[1]}) rotate(-100) scale(0.8)`}>
-        <path d={LEAF_PATH} fill="url(#cert-leaf)" />
-        <line x1="8" y1="0" x2="58" y2="0" stroke="#ffffff" strokeOpacity="0.65" strokeWidth="1.1" />
-      </g>
+      <Leaf transform={LAUREL_TIP} />
     </g>
   );
 }
