@@ -34,6 +34,7 @@ const CERT_FONTS = [
   '600 24px "Montserrat"',
   '700 24px "Montserrat"',
   '700 33px "Tinos"',
+  '400 74px "Mrs Saint Delafield"',
 ];
 
 /** Make a value safe to use as a file name. */

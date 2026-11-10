@@ -162,6 +162,10 @@ const CertificateDocument = memo(forwardRef(function CertificateDocument(
       <footer className="cert-footer">
         <div className="cert-signature">
           <span className="cert-signature-script">{COMPANY.signatoryName}</span>
+          {/* short pen stroke under the signature, as in the sample */}
+          <svg className="cert-signature-flourish" viewBox="0 0 92 14" aria-hidden="true">
+            <path d="M 2 12 Q 40 6 90 2" fill="none" stroke="#1b2f6b" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
           <span className="cert-signature-rule" />
           <strong>{COMPANY.signatoryName}</strong>
           <span>{COMPANY.signatoryTitle}</span>
@@ -187,7 +191,7 @@ const CertificateDocument = memo(forwardRef(function CertificateDocument(
 
         <div className="cert-qr">
           {verificationUrl ? (
-            <QRCodeSVG value={verificationUrl} size={104} level="M" marginSize={0} fgColor="#0a1f45" />
+            <QRCodeSVG value={verificationUrl} size={104} level="M" marginSize={0} fgColor="#111111" />
           ) : (
             <span className="cert-qr-missing">QR unavailable</span>
           )}
