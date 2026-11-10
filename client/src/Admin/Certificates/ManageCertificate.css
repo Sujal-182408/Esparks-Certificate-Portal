@@ -973,6 +973,33 @@
   overflow-wrap: anywhere;
 }
 
+/* Optional revocation reason (sent to the employee + audit log) */
+.revoke-reason-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.revoke-reason-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  font: inherit;
+}
+
+.revoke-reason-field textarea:focus {
+  outline: 2px solid rgba(34, 211, 238, 0.5);
+  border-color: transparent;
+}
+
 .revoke-deactivate-option {
   display: flex;
   align-items: flex-start;

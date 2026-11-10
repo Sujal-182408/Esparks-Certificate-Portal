@@ -21,6 +21,7 @@ import {
   QrCode,
   Radio,
   ScanLine,
+  Shield,
   ShieldCheck,
   Sparkles,
   User,

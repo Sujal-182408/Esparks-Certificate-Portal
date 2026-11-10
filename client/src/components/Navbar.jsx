@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {  LogOut, LayoutDashboard } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import brandLogo from "../assets/brand.png";
 export default function Navbar() {
   const { user, logout } = useAuth();

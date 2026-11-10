@@ -34,6 +34,8 @@ export default function ManageCertificates() {
   // Revoke confirmation state
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [deactivateEmployee, setDeactivateEmployee] = useState(false);
+  // Optional reason — shown to the employee in the email and stored in the audit log.
+  const [revokeReason, setRevokeReason] = useState("");
 
   // Delete confirmation and OTP state
   const [deletingId, setDeletingId] = useState(null);
@@ -107,6 +109,7 @@ export default function ManageCertificates() {
 
     setRevokeTarget(null);
     setDeactivateEmployee(false);
+    setRevokeReason("");
   };
 
   // Confirm certificate revocation
@@ -121,10 +124,9 @@ export default function ManageCertificates() {
       setSuccess("");
 
       const data = await revokeAdminCertificate(certificate.id, {
+        reason: revokeReason,
         deactivateEmployee,
       });
-
-      console.log("Certificate revoke response:", data);
 
       setCertificates((current) =>
         current.map((item) =>
@@ -150,6 +152,7 @@ export default function ManageCertificates() {
 
       setRevokeTarget(null);
       setDeactivateEmployee(false);
+      setRevokeReason("");
     } catch (error) {
       console.error("Certificate revoke error:", error);
       setError(error?.message || "Unable to revoke certificate.");
@@ -664,6 +667,18 @@ export default function ManageCertificates() {
                 </strong>
               </div>
             </div>
+
+            <label className="revoke-reason-field">
+              <span>Reason (optional, sent to the employee)</span>
+              <textarea
+                value={revokeReason}
+                onChange={(event) => setRevokeReason(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                placeholder="e.g. Issued with incorrect course details."
+                disabled={revokingId !== null}
+              />
+            </label>
 
             <label className="revoke-deactivate-option">
               <input

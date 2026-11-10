@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -10,11 +10,14 @@ import {
   ArrowRight,
   AlertCircle,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
+import { getPostLoginPath } from "../utils/redirect";
 
 export default function Login() {
-  const { login, loading } = useAuth();
+  const { login } = useAuth();
+  const [loading, setLoading] = useState(false); // true while the form is submitting
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [form, setForm] = useState({
     email: "",
@@ -48,16 +51,20 @@ export default function Login() {
       return;
     }
 
+    setLoading(true);
     try {
       await login(email, form.password);
 
-      navigate("/dashboard", {
+      // Go back to the page that required login (or the dashboard).
+      navigate(getPostLoginPath(location, "/dashboard", "/login"), {
         replace: true,
       });
     } catch (err) {
       setError(
         err?.message || "Login failed. Please try again."
       );
+    } finally {
+      setLoading(false);
     }
   }
 

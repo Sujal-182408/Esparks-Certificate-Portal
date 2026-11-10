@@ -11,10 +11,11 @@ import {
   ArrowRight,
   AlertCircle,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Register() {
-  const { register, loading } = useAuth();
+  const { register } = useAuth();
+  const [loading, setLoading] = useState(false); // true while the form is submitting
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -67,6 +68,7 @@ export default function Register() {
       return;
     }
 
+    setLoading(true);
     try {
       await register(name, email, form.password);
       navigate("/dashboard", { replace: true });
@@ -74,6 +76,8 @@ export default function Register() {
       setError(
         err.message || "Registration failed. Please try again."
       );
+    } finally {
+      setLoading(false);
     }
   }
 

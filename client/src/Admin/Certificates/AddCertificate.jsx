@@ -38,11 +38,6 @@ export default function AddCertificate() {
     return type || "—";
   };
 
-  const displayValue = (value) =>
-    value === null || value === undefined || value === ""
-      ? "—"
-      : value;
-
   const requestNumber = request?.id ?? request?.request_id ?? requestId;
   const employeeName = request?.employee_name ?? request?.employeeName ?? "—";
   const employeeEmail = request?.employee_email ?? request?.employeeEmail ?? "—";

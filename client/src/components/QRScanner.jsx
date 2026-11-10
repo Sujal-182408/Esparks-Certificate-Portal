@@ -4,7 +4,6 @@ import {
   CameraOff,
   RotateCcw,
   Upload,
-  ScanLine,
   ShieldCheck,
   AlertCircle,
 } from "lucide-react";

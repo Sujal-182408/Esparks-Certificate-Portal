@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
-  ShieldCheck,
   CheckCircle,
   AlertCircle,
   KeyRound,
