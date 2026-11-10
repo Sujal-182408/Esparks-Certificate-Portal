@@ -66,6 +66,12 @@ function GoldGradients() {
         <stop offset="0" stopColor="#0c3a6c" />
         <stop offset="1" stopColor="#001d39" />
       </linearGradient>
+      {/* Embossed look for the laurel: a soft grey-blue shadow down-right and
+          a white highlight up-left, merged under the shape. */}
+      <filter id="cert-emboss" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0.9" dy="1.2" stdDeviation="1" floodColor="#8d9bb0" floodOpacity="0.25" result="shade" />
+        <feDropShadow dx="-1" dy="-1.2" stdDeviation="0.8" floodColor="#ffffff" floodOpacity="0.9" />
+      </filter>
       <filter id="cert-blur" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur stdDeviation="7" />
       </filter>
@@ -221,40 +227,35 @@ const LAUREL_LEAVES = [
 const LAUREL_STEM =
   "M 1201 679 C 1214 672, 1259 651, 1280 638 C 1301 625, 1312 615, 1325 601 C 1338 587, 1351 571, 1361 555 C 1371 539, 1380 522, 1385 504 C 1390 486, 1394 466, 1394 447 C 1394 428, 1391 406, 1386 388 C 1381 370, 1371 352, 1362 336 C 1353 320, 1340 302, 1331 291 C 1322 280, 1310 272, 1306 268";
 
-// A leaf 2 units long, centred on (0, 0): the base (x = -1) is at the stem,
-// it is widest about a third of the way out and tapers to a sharp tip
-// (x = +1) — the shape of the leaves in the reference. Max width ≈ 0.88.
-const LEAF_UNIT = "M -1 0 C -0.72 -0.58, 0.2 -0.6, 1 0 C 0.2 0.6, -0.72 0.58, -1 0 Z";
-const LEAF_UNIT_WIDTH = 0.88;
+// A leaf 2 units long, centred on (0, 0), traced from the reference:
+// the BASE (x = -1) narrows to a point that flows into the stem, the leaf
+// is widest just past the middle, and the sides curve in to a long, fine
+// TIP (x = +1). Max width ≈ 0.86 units.
+const LEAF_UNIT =
+  "M -1 0 C -0.62 -0.2, -0.22 -0.45, 0.22 -0.43 C 0.6 -0.4, 0.86 -0.16, 1 0 " +
+  "C 0.86 0.16, 0.6 0.4, 0.22 0.43 C -0.22 0.45, -0.62 0.2, -1 0 Z";
+const LEAF_UNIT_WIDTH = 0.86;
 
 // Size correction: pixel moments assume a rectangle; for a pointed,
-// lens-shaped leaf the true length is ~1.25× and width ~1.3× larger
+// lens-shaped leaf the true length is ~1.25× and width ~1.15× larger
 // (checked by overlaying the result on the reference).
 const LEAF_LENGTH_FACTOR = 1.25;
-const LEAF_WIDTH_FACTOR = 1.3;
+const LEAF_WIDTH_FACTOR = 1.15;
 
 const LEAF_TRANSFORMS = LAUREL_LEAVES.map(
   ([x, y, angle, length, width]) =>
     `translate(${x} ${y}) rotate(${angle}) scale(${((length * LEAF_LENGTH_FACTOR) / 2).toFixed(2)} ${((width * LEAF_WIDTH_FACTOR) / LEAF_UNIT_WIDTH).toFixed(2)})`,
 );
 
-/** Large faint laurel branch on the right side (measured colours: #ced7e2–#d3dbe5, crisp darker edge). */
+/** Large faint laurel branch on the right side (measured colours: #ced7e2–#d3dbe5). */
 function Laurel() {
+  // No outlines: the reference leaves are EMBOSSED — a soft shadow on the
+  // lower-right edges and a light rim on the upper-left (see #cert-emboss).
   return (
-    <g>
-      <path d={LAUREL_STEM} fill="none" stroke="#b7c3d1" strokeWidth="6.6" strokeLinecap="round" />
-      <path d={LAUREL_STEM} fill="none" stroke="#d2dae4" strokeWidth="4.4" strokeLinecap="round" />
+    <g filter="url(#cert-emboss)">
+      <path d={LAUREL_STEM} fill="none" stroke="#ccd5df" strokeWidth="4.5" strokeLinecap="round" />
       {LEAF_TRANSFORMS.map((transform) => (
-        // vector-effect keeps the outline 1 px wide despite the non-uniform scale
-        <path
-          key={transform}
-          d={LEAF_UNIT}
-          fill="url(#cert-leaf)"
-          stroke="#b7c3d1"
-          strokeWidth="1.1"
-          vectorEffect="non-scaling-stroke"
-          transform={transform}
-        />
+        <path key={transform} d={LEAF_UNIT} fill="url(#cert-leaf)" transform={transform} />
       ))}
     </g>
   );
