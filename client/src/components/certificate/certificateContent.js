@@ -26,7 +26,7 @@ export const COMPANY = {
 
 /** ISO badges shown in the header (keep in sync with real certifications). */
 export const ISO_BADGES = [
-  { standard: "ISO 9001:2015", lines: ["Quality Management", "System"] },
+  { standard: "9001:2015", lines: ["Quality Management", "System"] }, // as in the reference mark
   { standard: "ISO/IEC 27001:2022", lines: ["Information Security", "Management System"] },
 ];
 

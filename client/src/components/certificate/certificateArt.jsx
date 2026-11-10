@@ -75,8 +75,8 @@ function GoldGradients() {
         <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
       </linearGradient>
       <linearGradient id="cert-leaf" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#e7e9ed" />
-        <stop offset="1" stopColor="#d9dce2" />
+        <stop offset="0" stopColor="#d8e0e9" />
+        <stop offset="1" stopColor="#c9d3de" />
       </linearGradient>
       <radialGradient id="cert-paper" cx="0.5" cy="0.45" r="0.8">
         <stop offset="0" stopColor="#ffffff" />
@@ -172,75 +172,63 @@ function Decorations() {
   );
 }
 
-/** Point + direction on a quadratic Bézier curve (used to place laurel leaves). */
-function bezier(t, p0, p1, p2) {
-  const mt = 1 - t;
-  return {
-    x: mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0],
-    y: mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1],
-    // derivative -> tangent angle in degrees
-    angle:
-      (Math.atan2(
-        2 * mt * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]),
-        2 * mt * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]),
-      ) *
-        180) /
-      Math.PI,
-  };
-}
+// ---- Laurel: MEASURED from the approved reference image ----
+// Each leaf below was extracted automatically from the reference
+// (threshold the leaf colour, erode away the thin stem, then take every
+// leaf's centre, axis angle, length and width from its pixel moments),
+// and converted to the 1500 × 1000 certificate grid. So the leaves sit
+// exactly where they are in the design instead of being approximated.
+//
+// [centre x, centre y, axis angle °, length, width]
+const LAUREL_LEAVES = [
+  [1282, 252, 33, 58, 24], // tip pair
+  [1333, 267, 71, 57, 23],
+  [1306, 299, 20, 58, 22],
+  [1376, 310, 88, 58, 24],
+  [1336, 344, 24, 60, 23],
+  [1406, 365, -79, 58, 25],
+  [1358, 393, 35, 58, 24],
+  [1420, 426, -65, 61, 26],
+  [1367, 448, 54, 55, 25],
+  [1415, 489, -47, 59, 26],
+  [1358, 500, 71, 54, 24],
+  [1395, 546, -30, 59, 24],
+  [1334, 547, 85, 55, 23],
+  [1300, 587, -84, 55, 23],
+  [1362, 598, -18, 61, 24],
+  [1258, 619, -72, 55, 23],
+  [1316, 642, -8, 59, 22],
+];
 
-// ---- Laurel geometry: computed ONCE when the module loads ----
-// Measured from the sample at 4× zoom (converted to the 1500 × 1000 grid):
-// stem from (1179, 669) at the bottom-left, bulging right to x ≈ 1370,
-// ending at (1290, 249). p1 is a Bézier control point (pulls the curve,
-// is not on it).
-const LAUREL_CURVE = { p0: [1179, 689], p1: [1505, 421], p2: [1290, 269] };
+// Stem: a smooth curve (Catmull-Rom) through the measured leaf bases,
+// starting with the bare tail at the bottom-left.
+const LAUREL_STEM =
+  "M 1201 679 C 1214 672, 1259 651, 1280 638 C 1301 625, 1312 615, 1325 601 C 1338 587, 1351 571, 1361 555 C 1371 539, 1380 522, 1385 504 C 1390 486, 1394 466, 1394 447 C 1394 428, 1391 406, 1386 388 C 1381 370, 1371 352, 1362 336 C 1353 320, 1340 302, 1331 291 C 1322 280, 1310 272, 1306 268";
 
-// One leaf pointing along +x from (0,0): about 74 × 27 px (≈ 2.6 : 1), pointed ends.
-const LEAF_PATH = "M 0 0 C 20 -18, 46 -16, 74 0 C 46 16, 20 18, 0 0 Z";
+// A leaf 2 units long and 0.75 units wide, centred on (0, 0) and pointed
+// at both ends. It is scaled to each measured length × width, so its
+// orientation (which end is the tip) doesn't matter.
+const LEAF_UNIT = "M -1 0 C -0.55 -0.5, 0.45 -0.5, 1 0 C 0.45 0.5, -0.55 0.5, -1 0 Z";
 
-// 7 large, well-spaced leaves per side, alternating, ~45° off the stem.
-const LAUREL_LEAVES = Array.from({ length: 7 }, (_, index) => {
-  const base = 0.09 + index * 0.12; // leaves start low on the stem, as in the sample
-  const size = 0.82 + 0.18 * Math.sin((Math.PI * (index + 1)) / 8); // a touch larger mid-branch
-  return [
-    { tilt: -45, t: base },
-    { tilt: 45, t: base + 0.055 },
-  ].map(({ tilt, t }) => {
-    const { x, y, angle } = bezier(t, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
-    return {
-      key: `${index}${tilt}`,
-      transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(angle + tilt).toFixed(1)}) scale(${size.toFixed(3)})`,
-    };
-  });
-}).flat();
+// Size correction: pixel moments assume a rectangle; for a pointed,
+// lens-shaped leaf the true length is ~1.25× and width ~1.3× larger
+// (checked by overlaying the result on the reference).
+const LEAF_LENGTH_FACTOR = 1.25;
+const LEAF_WIDTH_FACTOR = 1.3;
 
-// The tip leaf continues the stem's direction at the top.
-const LAUREL_TIP = (() => {
-  const { x, y, angle } = bezier(1, LAUREL_CURVE.p0, LAUREL_CURVE.p1, LAUREL_CURVE.p2);
-  return `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${angle.toFixed(1)}) scale(0.8)`;
-})();
+const LEAF_TRANSFORMS = LAUREL_LEAVES.map(
+  ([x, y, angle, length, width]) =>
+    `translate(${x} ${y}) rotate(${angle}) scale(${((length * LEAF_LENGTH_FACTOR) / 2).toFixed(2)} ${((width * LEAF_WIDTH_FACTOR) / 0.75).toFixed(2)})`,
+);
 
-function Leaf({ transform }) {
-  return <path d={LEAF_PATH} fill="url(#cert-leaf)" transform={transform} />;
-}
-
-/** Large faint laurel branch on the right side. */
+/** Large faint laurel branch on the right side (measured colours: #ced7e2–#d3dbe5). */
 function Laurel() {
-  const { p0, p1, p2 } = LAUREL_CURVE;
   return (
     <g>
-      <path
-        d={`M ${p0[0]} ${p0[1]} Q ${p1[0]} ${p1[1]} ${p2[0]} ${p2[1]}`}
-        fill="none"
-        stroke="#d6dae0"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      {LAUREL_LEAVES.map(({ key, transform }) => (
-        <Leaf key={key} transform={transform} />
+      <path d={LAUREL_STEM} fill="none" stroke="#ccd5df" strokeWidth="5" strokeLinecap="round" />
+      {LEAF_TRANSFORMS.map((transform) => (
+        <path key={transform} d={LEAF_UNIT} fill="url(#cert-leaf)" transform={transform} />
       ))}
-      <Leaf transform={LAUREL_TIP} />
     </g>
   );
 }
@@ -281,42 +269,24 @@ export function EsMark({ height = 76 }) {
   );
 }
 
-// ---- ISO globe geometry (computed once) ----
-// The lettering sits in a horizontal gap (y 30–60) across a globe of
-// radius 42 centred at (50, 45). Instead of hiding lines with an SVG mask
-// (which the PDF exporter ignores), every curve is drawn as two arcs
-// that stop at the gap — plain geometry renders the same everywhere.
-const ISO_GAP_TOP = 30;
-const ISO_GAP_BOTTOM = 60;
-const ISO_HALF_GAP = 15; // distance from the centre line to each gap edge
-
-/** Top + bottom arcs of an ellipse (rx × 42) centred on the globe, with the gap removed. */
-function isoArcs(rx) {
-  const dx = rx * Math.sqrt(1 - (ISO_HALF_GAP / 42) ** 2); // x where the ellipse meets the gap
-  const left = (50 - dx).toFixed(2);
-  const right = (50 + dx).toFixed(2);
-  return [
-    `M ${left} ${ISO_GAP_TOP} A ${rx} 42 0 0 1 ${right} ${ISO_GAP_TOP}`,
-    `M ${left} ${ISO_GAP_BOTTOM} A ${rx} 42 0 0 0 ${right} ${ISO_GAP_BOTTOM}`,
-  ];
-}
-
-const ISO_GLOBE_PATHS = [
-  ...isoArcs(42), // outline
-  ...isoArcs(33), // outer meridians
-  ...isoArcs(17), // inner meridians
-  `M 50 3 V ${ISO_GAP_TOP}`, // central meridian (top half)
-  `M 50 ${ISO_GAP_BOTTOM} V 87`, // central meridian (bottom half)
-  "M 16 20 Q 50 30 84 20", // northern parallel
-  "M 16 70 Q 50 60 84 70", // southern parallel
+// ---- ISO mark: the top half of a globe (a dome) above the lettering ----
+// Matches the official-style mark in the reference: a circular cap
+// (chord 88, height 28 → circle radius 48.6, centre (44, 50.6)) with the
+// central meridian, two pairs of curved meridians and one parallel.
+// The bold slab-serif "ISO" below it is HTML text (see the CSS).
+const ISO_DOME_PATHS = [
+  "M 0 30 A 48.6 48.6 0 0 1 88 30", // outline
+  "M 15 30 A 32 48.6 0 0 1 73 30", // outer meridians
+  "M 29.5 30 A 16 48.6 0 0 1 58.5 30", // inner meridians
+  "M 44 2 V 30", // central meridian
+  "M 9.9 16 Q 44 21 78.1 16", // parallel
 ];
 
-/** Globe for the ISO badges, drawn like the official ISO mark (lettering is HTML on top). */
 export function IsoGlobe() {
   return (
-    <svg viewBox="0 0 100 90" width="100" height="90" aria-hidden="true">
-      <g fill="none" stroke="#1f3f8f" strokeWidth="2.2">
-        {ISO_GLOBE_PATHS.map((d) => (
+    <svg viewBox="-2 0 92 32" width="92" height="32" aria-hidden="true">
+      <g fill="none" stroke="#1a2b66" strokeWidth="2.4" strokeLinecap="round">
+        {ISO_DOME_PATHS.map((d) => (
           <path key={d} d={d} />
         ))}
       </g>
@@ -337,28 +307,30 @@ const SEAL_BUMPS = Array.from({ length: SEAL_BUMP_COUNT }, (_, i) => {
   return { cx: SEAL_CX + 90 * Math.cos(a), cy: SEAL_CY + 90 * Math.sin(a) };
 });
 
-// Laurel wreath: two branches climbing from the bottom up each side.
-// θ is measured clockwise from 12 o'clock. Each step has an outer and an
-// inner leaf, tilted away from the stem.
-const WREATH_RADIUS = 57;
-const WREATH_STEPS = Array.from({ length: 10 }, (_, i) => 168 - i * 14); // 168° -> 42°
+// Laurel wreath, measured from the reference seal: two branches at
+// ~0.62 R that start just past the bottom (their stems cross there) and
+// climb to ~30° from the top. Each node has an outer and an inner leaf.
+// θ is measured clockwise from 12 o'clock.
+const WREATH_RADIUS = 60;
+const WREATH_STEPS = Array.from({ length: 11 }, (_, i) => 158 - i * 12.2); // 158° -> 36° (bottom kept clear, as in the reference)
 
 const SEAL_WREATH = WREATH_STEPS.flatMap((deg, i) =>
   [-1, 1].flatMap((side) =>
     [1, -1].map((layer) => {
-      const r = WREATH_RADIUS + layer * 6;
+      const r = WREATH_RADIUS + layer * 5.5;
       const a = (deg * Math.PI) / 180;
       const x = SEAL_CX + side * r * Math.sin(a);
       const y = SEAL_CY - r * Math.cos(a);
-      const tilt = side * (deg + layer * 32);
+      const tilt = side * (deg + layer * 34);
       return { key: `${side}${layer}${i}`, x, y, transform: `rotate(${tilt} ${x} ${y})` };
     }),
   ),
 );
 
+// Stems run from 204° (past the bottom, so the two visibly cross) up to 36°.
 const WREATH_STEMS = [-1, 1].map((side) =>
-  Array.from({ length: 33 }, (_, i) => {
-    const a = ((172 - i * 4.25) * Math.PI) / 180;
+  Array.from({ length: 43 }, (_, i) => {
+    const a = ((204 - i * 4.0) * Math.PI) / 180;
     return `${(SEAL_CX + side * WREATH_RADIUS * Math.sin(a)).toFixed(1)},${(SEAL_CY - WREATH_RADIUS * Math.cos(a)).toFixed(1)}`;
   }).join(" "),
 );
@@ -368,15 +340,18 @@ const MONO_SCALE = 78 / 750;
 const MONO_X = SEAL_CX - 39;
 const MONO_Y = SEAL_CY - (415 * MONO_SCALE) / 2;
 
-/** One navy ribbon tail with two gold stripes (the right one is mirrored). */
+/**
+ * One navy ribbon tail (the right one is mirrored). Measured from the
+ * reference: wide tails (~0.6 R) hanging almost straight down to 1.6 R
+ * below the centre, with a gold stripe along both long edges and a V-notch.
+ */
 function RibbonTail(props) {
   return (
     <g {...props}>
-      {/* tail splays down-left from under the medal; V-notch at the end */}
-      <polygon points="66,140 110,160 82,238 64,220 38,228" fill="url(#seal-ribbon)" />
-      <g stroke="#d9b04a" strokeWidth="2.2" fill="none">
-        <line x1="72" y1="150" x2="45" y2="221" />
-        <line x1="103" y1="164" x2="78" y2="229" />
+      <polygon points="52,157 108,175 80,263 58,235 24,245" fill="url(#seal-ribbon)" />
+      <g stroke="#e0b64e" strokeWidth="2.4" fill="none">
+        <line x1="103" y1="173" x2="76" y2="257" />
+        <line x1="57" y1="159" x2="31" y2="242" />
       </g>
     </g>
   );
@@ -402,13 +377,20 @@ export function GoldSeal() {
           <stop offset="0.6" stopColor="#e5b744" />
           <stop offset="1" stopColor="#c4922a" />
         </radialGradient>
+        {/* measured monogram colour: #965907 (orange-bronze) */}
         <linearGradient id="seal-bronze" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#b98a24" />
-          <stop offset="1" stopColor="#8a5f10" />
+          <stop offset="0" stopColor="#a8650c" />
+          <stop offset="1" stopColor="#7c4606" />
         </linearGradient>
+        {/* measured ribbon navy: #0c2f60 */}
         <linearGradient id="seal-ribbon" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1d4a8f" />
-          <stop offset="1" stopColor="#0a1f45" />
+          <stop offset="0" stopColor="#173f7a" />
+          <stop offset="1" stopColor="#0a2550" />
+        </linearGradient>
+        <linearGradient id="seal-rim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffe27a" />
+          <stop offset="0.5" stopColor="#f2bf34" />
+          <stop offset="1" stopColor="#b8820f" />
         </linearGradient>
       </defs>
 
@@ -424,20 +406,19 @@ export function GoldSeal() {
         ))}
       </g>
 
-      {/* raised rings + face */}
-      <circle cx={cx} cy={cy} r="82" fill="none" stroke="#a87a1c" strokeWidth="2" />
-      <circle cx={cx} cy={cy} r="78" fill="url(#seal-face)" stroke="#fbe7a6" strokeWidth="2" />
-      <circle cx={cx} cy={cy} r="71" fill="none" stroke="#b8891f" strokeWidth="1.2" opacity="0.7" />
+      {/* measured rings: bright raised rim band 0.86–0.94 R, dark groove at 0.82 R, face inside */}
+      <circle cx={cx} cy={cy} r="88.5" fill="none" stroke="url(#seal-rim)" strokeWidth="8" />
+      <circle cx={cx} cy={cy} r="82" fill="url(#seal-face)" stroke="#8a5a0e" strokeWidth="2" />
 
       {/* laurel wreath */}
-      <g fill="none" stroke="#a5761a" strokeWidth="2">
+      <g fill="none" stroke="#91500a" strokeWidth="2">
         {WREATH_STEMS.map((points) => (
           <polyline key={points.slice(0, 12)} points={points} />
         ))}
       </g>
-      <g fill="#a5761a">
+      <g fill="#91500a">
         {SEAL_WREATH.map(({ key, x, y, transform }) => (
-          <ellipse key={key} cx={x} cy={y} rx="6.5" ry="2.8" transform={transform} />
+          <ellipse key={key} cx={x} cy={y} rx="7" ry="3" transform={transform} />
         ))}
       </g>
 
@@ -449,7 +430,8 @@ export function GoldSeal() {
       <g transform={`translate(${MONO_X} ${MONO_Y}) scale(${MONO_SCALE})`} fill="url(#seal-bronze)">
         <path d={ES_PATHS.e} />
         <path d={ES_PATHS.s} />
-        <path d={ES_PATHS.accent} fill="#fbe7a6" />
+        {/* measured accent: orange #e86c15 */}
+        <path d={ES_PATHS.accent} fill="#e86c15" />
       </g>
     </svg>
   );
