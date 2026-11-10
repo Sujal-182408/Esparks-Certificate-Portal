@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminEmployees.css";
@@ -21,28 +22,18 @@ import { apiRequest } from "../../services/api";
 import BackButton from "../../components/BackButton";
 
 export default function AdminEmployees() {
-    const navigate = useNavigate();
-  // =========================================================
+  const navigate = useNavigate();
+
   // STATE
-  // =========================================================
-
   const [employees, setEmployees] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
-
+  const [actionError, setActionError] = useState("");
   const [search, setSearch] = useState("");
-
   const [statusFilter, setStatusFilter] = useState("all");
+  const [updatingEmployeeId, setUpdatingEmployeeId] = useState(null);
 
-
-  
-  // =========================================================
   // LOAD EMPLOYEES
-  // =========================================================
-
-
   useEffect(() => {
     loadEmployees();
   }, []);
@@ -56,23 +47,6 @@ export default function AdminEmployees() {
         method: "GET",
       });
 
-      console.log(
-        "========== ADMIN EMPLOYEES =========="
-      );
-
-      console.log("FULL RESPONSE:", data);
-
-      console.log("EMPLOYEES:", data?.employees);
-
-      console.log(
-        "EMPLOYEE COUNT:",
-        data?.employees?.length
-      );
-
-      console.log(
-        "===================================="
-      );
-
       const employeeList = Array.isArray(data?.employees)
         ? data.employees
         : Array.isArray(data)
@@ -81,55 +55,30 @@ export default function AdminEmployees() {
 
       setEmployees(employeeList);
     } catch (error) {
-      console.error(
-        "Load employees error:",
-        error
-      );
-
+      console.error("Load employees error:", error);
       setEmployees([]);
-
-      setError(
-        error?.message ||
-          "Unable to load employees."
-      );
+      setError(error?.message || "Unable to load employees.");
     } finally {
       setLoading(false);
     }
   }
 
-  // =========================================================
   // FORMAT DATE
-  // =========================================================
-
   function formatDate(date) {
-    if (!date) {
-      return "—";
-    }
+    if (!date) return "—";
 
     const parsedDate = new Date(date);
 
-    if (
-      Number.isNaN(
-        parsedDate.getTime()
-      )
-    ) {
-      return "—";
-    }
+    if (Number.isNaN(parsedDate.getTime())) return "—";
 
-    return parsedDate.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }
-    );
+    return parsedDate.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   }
 
-  // =========================================================
   // EMPLOYEE HELPERS
-  // =========================================================
-
   function getEmployeeName(employee) {
     return (
       employee?.name ||
@@ -159,40 +108,25 @@ export default function AdminEmployees() {
     );
   }
 
-  // =========================================================
   // STATISTICS
-  // =========================================================
+  const activeCount = useMemo(
+    () => employees.filter(isEmployeeActive).length,
+    [employees]
+  );
 
-  const activeCount = useMemo(() => {
-    return employees.filter((employee) =>
-      isEmployeeActive(employee)
-    ).length;
-  }, [employees]);
+  const inactiveCount = useMemo(
+    () => employees.length - activeCount,
+    [employees, activeCount]
+  );
 
-  const inactiveCount = useMemo(() => {
-    return employees.length - activeCount;
-  }, [employees, activeCount]);
-
-  // =========================================================
   // SEARCH + FILTER
-  // =========================================================
-
   const filteredEmployees = useMemo(() => {
-    const cleanSearch =
-      search.trim().toLowerCase();
+    const cleanSearch = search.trim().toLowerCase();
 
     return employees.filter((employee) => {
-      const name = getEmployeeName(
-        employee
-      ).toLowerCase();
-
-      const email = getEmployeeEmail(
-        employee
-      ).toLowerCase();
-
-      const id = String(
-        getEmployeeId(employee)
-      ).toLowerCase();
+      const name = getEmployeeName(employee).toLowerCase();
+      const email = getEmployeeEmail(employee).toLowerCase();
+      const id = String(getEmployeeId(employee)).toLowerCase();
 
       const matchesSearch =
         !cleanSearch ||
@@ -200,115 +134,141 @@ export default function AdminEmployees() {
         email.includes(cleanSearch) ||
         id.includes(cleanSearch);
 
-      const active =
-        isEmployeeActive(employee);
+      const active = isEmployeeActive(employee);
 
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "active" &&
-          active) ||
-        (statusFilter === "inactive" &&
-          !active);
+        (statusFilter === "active" && active) ||
+        (statusFilter === "inactive" && !active);
 
-      return (
-        matchesSearch &&
-        matchesStatus
-      );
+      return matchesSearch && matchesStatus;
     });
-  }, [
-    employees,
-    search,
-    statusFilter,
-  ]);
+  }, [employees, search, statusFilter]);
 
-  // =========================================================
   // VIEW EMPLOYEE
-  // =========================================================
+  function viewEmployee(employee) {
+    const employeeId = employee?.id;
 
-function viewEmployee(employee) {
-  const employeeId = employee?.id;
+    if (
+      employeeId === undefined ||
+      employeeId === null ||
+      String(employeeId).trim() === ""
+    ) {
+      setActionError("Employee ID is missing.");
+      return;
+    }
 
-  if (employeeId === undefined || employeeId === null || String(employeeId).trim() === "") {
-    console.error("Missing employee ID:", employee);
-    setError("Unable to open employee details: employee ID is missing.");
-    return;
+    navigate(
+      `/admin/employees/${encodeURIComponent(String(employeeId))}`
+    );
   }
 
-  navigate(`/admin/employees/${encodeURIComponent(String(employeeId))}`);
-}
-  // =========================================================
-  // LOADING
-  // =========================================================
+  // ACTIVATE / DEACTIVATE EMPLOYEE
+  async function toggleEmployeeStatus(employee) {
+    const employeeId = employee?.id;
 
+    if (
+      employeeId === undefined ||
+      employeeId === null ||
+      String(employeeId).trim() === ""
+    ) {
+      setActionError("Employee ID is missing.");
+      return;
+    }
+
+    const currentStatus = isEmployeeActive(employee);
+    const nextStatus = !currentStatus;
+    const employeeName = getEmployeeName(employee);
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${
+        nextStatus ? "activate" : "deactivate"
+      } ${employeeName}'s account?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setUpdatingEmployeeId(String(employeeId));
+      setActionError("");
+
+      const response = await apiRequest(
+        `/admin/employees/${encodeURIComponent(String(employeeId))}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_active: nextStatus,
+          }),
+        }
+      );
+
+      if (response?.success === false) {
+        throw new Error(
+          response?.message || "Unable to update employee status."
+        );
+      }
+
+      setEmployees((previous) =>
+        previous.map((item) =>
+          String(item.id) === String(employeeId)
+            ? {
+                ...item,
+                is_active:
+                  response?.employee?.is_active ?? nextStatus,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Update employee status error:", error);
+      setActionError(
+        error?.message || "Unable to update employee status."
+      );
+    } finally {
+      setUpdatingEmployeeId(null);
+    }
+  }
+
+  // LOADING
   if (loading) {
     return (
       <div className="admin-employees-page">
         <div className="admin-employees-container">
-
-          <BackButton
-            text="Back to Dashboard"
-            to="/admin"
-          />
+          <BackButton text="Back to Dashboard" to="/admin" />
 
           <div className="employees-message">
-
-            <Loader2
-              size={25}
-              className="rotate-icon"
-            />
-
-            <span>
-              Loading employees...
-            </span>
-
+            <Loader2 size={25} className="rotate-icon" />
+            <span>Loading employees...</span>
           </div>
-
         </div>
       </div>
     );
   }
 
-  // =========================================================
   // MAIN
-  // =========================================================
-
   return (
     <div className="admin-employees-page">
-
       <div className="admin-employees-container">
 
-        {/* ===================================================
-            BACK
-        =================================================== */}
+        {/* BACK */}
+        <BackButton text="Back to Dashboard" to="/admin" />
 
-        <BackButton
-          text="Back to Dashboard"
-          to="/admin"
-        />
-
-        {/* ===================================================
-            HEADER
-        =================================================== */}
-
+        {/* HEADER */}
         <div className="employees-header">
-
           <div className="employees-title">
-
             <div className="employees-title-icon">
               <Users size={30} />
             </div>
 
             <div>
-              <h1>
-                Employee Management
-              </h1>
-
+              <h1>Employee Management</h1>
               <p>
-                Monitor registered employees
-                and their certificate activity.
+                Monitor registered employees and their certificate activity.
               </p>
             </div>
-
           </div>
 
           <button
@@ -317,39 +277,19 @@ function viewEmployee(employee) {
             onClick={loadEmployees}
             disabled={loading}
           >
-            <RefreshCw
-              size={17}
-              className={
-                loading
-                  ? "rotate-icon"
-                  : ""
-              }
-            />
-
+            <RefreshCw size={17} />
             Refresh
           </button>
-
         </div>
 
-        {/* ===================================================
-            ERROR
-        =================================================== */}
-
+        {/* LOAD ERROR */}
         {error && (
           <div className="employees-error">
-
             <AlertCircle size={22} />
 
             <div className="employees-error-content">
-
-              <strong>
-                Unable to load employees
-              </strong>
-
-              <p>
-                {error}
-              </p>
-
+              <strong>Unable to load employees</strong>
+              <p>{error}</p>
             </div>
 
             <button
@@ -359,212 +299,136 @@ function viewEmployee(employee) {
             >
               Retry
             </button>
+          </div>
+        )}
 
+        {/* ACTION ERROR */}
+        {actionError && (
+          <div className="employee-action-error">
+            <AlertCircle size={18} />
+            <span>{actionError}</span>
+
+            <button
+              type="button"
+              onClick={() => setActionError("")}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
           </div>
         )}
 
         {!error && (
           <>
-            {/* =================================================
-                STATISTICS
-            ================================================= */}
-
+            {/* STATISTICS */}
             <div className="employee-stats">
 
-              {/* TOTAL */}
-
               <div className="employee-stat-card">
-
                 <div className="employee-stat-icon total">
                   <Users size={21} />
                 </div>
 
                 <div className="employee-stat-content">
-
-                  <span>
-                    Total Employees
-                  </span>
-
-                  <strong>
-                    {employees.length}
-                  </strong>
-
+                  <span>Total Employees</span>
+                  <strong>{employees.length}</strong>
                 </div>
-
               </div>
 
-              {/* ACTIVE */}
-
               <div className="employee-stat-card">
-
                 <div className="employee-stat-icon active">
                   <UserCheck size={21} />
                 </div>
 
                 <div className="employee-stat-content">
-
-                  <span>
-                    Active Employees
-                  </span>
-
-                  <strong>
-                    {activeCount}
-                  </strong>
-
+                  <span>Active Employees</span>
+                  <strong>{activeCount}</strong>
                 </div>
-
               </div>
 
-              {/* INACTIVE */}
-
               <div className="employee-stat-card">
-
                 <div className="employee-stat-icon inactive">
                   <UserX size={21} />
                 </div>
 
                 <div className="employee-stat-content">
-
-                  <span>
-                    Inactive Employees
-                  </span>
-
-                  <strong>
-                    {inactiveCount}
-                  </strong>
-
+                  <span>Inactive Employees</span>
+                  <strong>{inactiveCount}</strong>
                 </div>
-
               </div>
-
             </div>
 
-            {/* =================================================
-                SEARCH + FILTER
-            ================================================= */}
-
+            {/* SEARCH + FILTER */}
             <div className="employee-tools">
-
               <div className="employee-search">
-
                 <Search size={18} />
 
                 <input
                   type="text"
                   placeholder="Search name, email or employee ID..."
                   value={search}
-                  onChange={(event) =>
-                    setSearch(
-                      event.target.value
-                    )
-                  }
+                  onChange={(event) => setSearch(event.target.value)}
                 />
 
                 {search && (
                   <button
                     type="button"
                     className="clear-search"
-                    onClick={() =>
-                      setSearch("")
-                    }
+                    onClick={() => setSearch("")}
                     aria-label="Clear search"
                   >
                     ×
                   </button>
                 )}
-
               </div>
 
               <div className="employee-filter">
-
                 <Filter size={17} />
 
                 <select
                   value={statusFilter}
                   onChange={(event) =>
-                    setStatusFilter(
-                      event.target.value
-                    )
+                    setStatusFilter(event.target.value)
                   }
                 >
-                  <option value="all">
-                    All Status
-                  </option>
-
-                  <option value="active">
-                    Active
-                  </option>
-
-                  <option value="inactive">
-                    Inactive
-                  </option>
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
                 </select>
-
               </div>
-
             </div>
 
-            {/* =================================================
-                RESULTS INFO
-            ================================================= */}
-
+            {/* RESULTS INFO */}
             <div className="employee-results-info">
-
               <span>
-                Showing{" "}
-                <strong>
-                  {filteredEmployees.length}
-                </strong>{" "}
-                of{" "}
-                <strong>
-                  {employees.length}
-                </strong>{" "}
-                employees
+                Showing <strong>{filteredEmployees.length}</strong> of{" "}
+                <strong>{employees.length}</strong> employees
               </span>
 
-              {(search ||
-                statusFilter !==
-                  "all") && (
+              {(search || statusFilter !== "all") && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearch("");
-                    setStatusFilter(
-                      "all"
-                    );
+                    setStatusFilter("all");
                   }}
                 >
                   Clear filters
                 </button>
               )}
-
             </div>
 
-            {/* =================================================
-                EMPLOYEE LIST
-            ================================================= */}
-
+            {/* EMPLOYEE LIST */}
             <div className="employees-table-wrapper">
-
               {employees.length === 0 ? (
-
-                /* =============================================
-                   NO EMPLOYEES
-                ============================================= */
-
                 <div className="employees-empty">
-
                   <div className="employees-empty-icon">
                     <Users size={40} />
                   </div>
 
-                  <h3>
-                    No Registered Employees
-                  </h3>
+                  <h3>No Registered Employees</h3>
 
                   <p>
-                    There are currently no
-                    registered employee accounts.
+                    There are currently no registered employee accounts.
                   </p>
 
                   <button
@@ -575,428 +439,292 @@ function viewEmployee(employee) {
                     <RefreshCw size={16} />
                     Refresh Employees
                   </button>
-
                 </div>
-
-              ) : filteredEmployees.length ===
-                0 ? (
-
-                /* =============================================
-                   NO SEARCH RESULT
-                ============================================= */
-
+              ) : filteredEmployees.length === 0 ? (
                 <div className="employees-empty">
-
                   <div className="employees-empty-icon">
                     <Search size={38} />
                   </div>
 
-                  <h3>
-                    No Employees Found
-                  </h3>
+                  <h3>No Employees Found</h3>
 
-                  <p>
-                    Try changing your search
-                    or status filter.
-                  </p>
+                  <p>Try changing your search or status filter.</p>
 
                   <button
                     type="button"
                     className="refresh-btn"
                     onClick={() => {
                       setSearch("");
-                      setStatusFilter(
-                        "all"
-                      );
+                      setStatusFilter("all");
                     }}
                   >
                     Clear Filters
                   </button>
-
                 </div>
-
               ) : (
-
                 <>
-                  {/* =========================================
-                      DESKTOP TABLE
-                  ========================================= */}
-
+                  {/* DESKTOP TABLE */}
                   <div className="employees-table-scroll">
-
                     <table className="employees-table">
-
                       <thead>
-
                         <tr>
-
-                          <th>
-                            Employee
-                          </th>
-
-                          <th>
-                            Email
-                          </th>
-
-                          <th>
-                            Status
-                          </th>
-
-                          <th>
-                            Rejected Requests
-                          </th>
-
-                          <th>
-                            Registered
-                          </th>
-
-                          <th>
-                            Action
-                          </th>
-
+                          <th>Employee</th>
+                          <th>Email</th>
+                          <th>Status</th>
+                          
+                          <th>Registered</th>
+                          <th>Action</th>
                         </tr>
-
                       </thead>
 
                       <tbody>
+                        {filteredEmployees.map((employee, index) => {
+                          const name = getEmployeeName(employee);
+                          const email = getEmployeeEmail(employee);
+                          const active = isEmployeeActive(employee);
+                          const employeeId = String(employee.id);
+                          const updating =
+                            updatingEmployeeId === employeeId;
 
-                        {filteredEmployees.map(
-                          (
-                            employee,
-                            index
-                          ) => {
-
-                            const name =
-                              getEmployeeName(
-                                employee
-                              );
-
-                            const email =
-                              getEmployeeEmail(
-                                employee
-                              );
-
-                            const active =
-                              isEmployeeActive(
-                                employee
-                              );
-
-                            return (
-                              <tr
-                                key={
-                                  employee?.id ||
-                                  `employee-${index}`
-                                }
-                              >
-
-                                {/* EMPLOYEE */}
-
-                                <td>
-
-                                  <div className="employee-name">
-
-                                    <div className="employee-avatar">
-                                      {name
-                                        .charAt(
-                                          0
-                                        )
-                                        .toUpperCase()}
-                                    </div>
-
-                                    <div className="employee-name-content">
-
-                                      <strong>
-                                        {name}
-                                      </strong>
-
-                                      <span>
-                                        ID #
-                                        {employee?.id ??
-                                          "—"}
-                                      </span>
-
-                                    </div>
-
+                          return (
+                            <tr key={employee?.id ?? `employee-${index}`}>
+                              {/* EMPLOYEE */}
+                              <td>
+                                <div className="employee-name">
+                                  <div className="employee-avatar">
+                                    {name.charAt(0).toUpperCase()}
                                   </div>
 
-                                </td>
-
-                                {/* EMAIL */}
-
-                                <td>
-
-                                  <div className="employee-email">
-
-                                    <Mail
-                                      size={15}
-                                    />
-
-                                    <span>
-                                      {email}
-                                    </span>
-
+                                  <div className="employee-name-content">
+                                    <strong>{name}</strong>
+                                    <span>ID #{employee?.id ?? "—"}</span>
                                   </div>
+                                </div>
+                              </td>
 
-                                </td>
+                              {/* EMAIL */}
+                              <td>
+                                <div className="employee-email">
+                                  <Mail size={15} />
+                                  <span>{email}</span>
+                                </div>
+                              </td>
 
-                                {/* STATUS */}
+                              {/* STATUS */}
+                              <td>
+                                <span
+                                  className={
+                                    active
+                                      ? "status active"
+                                      : "status inactive"
+                                  }
+                                >
+                                  <span className="status-dot" />
+                                  {active ? "Active" : "Inactive"}
+                                </span>
+                              </td>
 
-                                <td>
-
-                                  <span
-                                    className={
-                                      active
-                                        ? "status active"
-                                        : "status inactive"
-                                    }
-                                  >
-
-                                    <span className="status-dot" />
-
-                                    {active
-                                      ? "Active"
-                                      : "Inactive"}
-
+                              {/* REGISTERED */}
+                              <td>
+                                <div className="employee-created">
+                                  <CalendarDays size={14} />
+                                  <span>
+                                    {formatDate(
+                                      employee?.created_at ||
+                                        employee?.createdAt
+                                    )}
                                   </span>
+                                </div>
+                              </td>
 
-                                </td>
-
-                                {/* REJECTED REQUESTS */}
-
-                                <td>
-                                  <span className={`rejected-request-count ${(Number(employee?.rejected_request_count) || 0) > 0 ? "has-rejections" : ""}`}>
-                                    {Number(employee?.rejected_request_count) || 0}
-                                  </span>
-                                </td>
-
-                                {/* DATE */}
-
-                                <td>
-
-                                  <div className="employee-created">
-
-                                    <CalendarDays
-                                      size={14}
-                                    />
-
-                                    <span>
-                                      {formatDate(
-                                        employee?.created_at ||
-                                          employee?.createdAt
-                                      )}
-                                    </span>
-
-                                  </div>
-
-                                </td>
-
-                                {/* ACTION */}
-
-                                <td>
-
+                              {/* ACTIONS */}
+                              <td>
+                                <div className="employee-action-buttons">
                                   <button
                                     type="button"
                                     className="view-employee-btn"
-                                    onClick={() =>
-                                      viewEmployee(
-                                        employee
-                                      )
-                                    }
+                                    onClick={() => viewEmployee(employee)}
                                   >
-
-                                    <Eye
-                                      size={16}
-                                    />
-
+                                    <Eye size={16} />
                                     View
-
                                   </button>
 
-                                </td>
+                                  <button
+                                    type="button"
+                                    className={`toggle-employee-btn ${
+                                      active ? "deactivate" : "activate"
+                                    }`}
+                                    onClick={() =>
+                                      toggleEmployeeStatus(employee)
+                                    }
+                                    disabled={updating}
+                                  >
+                                    {updating ? (
+                                      <Loader2
+                                        size={15}
+                                        className="rotate-icon"
+                                      />
+                                    ) : active ? (
+                                      <UserX size={15} />
+                                    ) : (
+                                      <UserCheck size={15} />
+                                    )}
 
-                              </tr>
-                            );
-                          }
-                        )}
-
+                                    {updating
+                                      ? "Updating..."
+                                      : active
+                                      ? "Deactivate"
+                                      : "Activate"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
-
                     </table>
-
                   </div>
 
-                  {/* =========================================
-                      MOBILE CARDS
-                  ========================================= */}
-
+                  {/* MOBILE CARDS */}
                   <div className="employee-mobile-list">
+                    {filteredEmployees.map((employee, index) => {
+                      const name = getEmployeeName(employee);
+                      const email = getEmployeeEmail(employee);
+                      const active = isEmployeeActive(employee);
+                      const employeeId = String(employee.id);
+                      const updating =
+                        updatingEmployeeId === employeeId;
 
-                    {filteredEmployees.map(
-                      (
-                        employee,
-                        index
-                      ) => {
-
-                        const name =
-                          getEmployeeName(
-                            employee
-                          );
-
-                        const email =
-                          getEmployeeEmail(
-                            employee
-                          );
-
-                        const active =
-                          isEmployeeActive(
-                            employee
-                          );
-
-                        return (
-                          <div
-                            className="employee-mobile-card"
-                            key={
-                              employee?.id ||
-                              `mobile-${index}`
-                            }
-                          >
-
-                            <div className="mobile-employee-top">
-
-                              <div className="employee-name">
-
-                                <div className="employee-avatar">
-                                  {name
-                                    .charAt(
-                                      0
-                                    )
-                                    .toUpperCase()}
-                                </div>
-
-                                <div className="employee-name-content">
-
-                                  <strong>
-                                    {name}
-                                  </strong>
-
-                                  <span>
-                                    ID #
-                                    {employee?.id ??
-                                      "—"}
-                                  </span>
-
-                                </div>
-
+                      return (
+                        <div
+                          className="employee-mobile-card"
+                          key={employee?.id ?? `mobile-${index}`}
+                        >
+                          <div className="mobile-employee-top">
+                            <div className="employee-name">
+                              <div className="employee-avatar">
+                                {name.charAt(0).toUpperCase()}
                               </div>
 
-                              <span
-                                className={
-                                  active
-                                    ? "status active"
-                                    : "status inactive"
-                                }
-                              >
-                                <span className="status-dot" />
-                                {active
-                                  ? "Active"
-                                  : "Inactive"}
-                              </span>
-
+                              <div className="employee-name-content">
+                                <strong>{name}</strong>
+                                <span>ID #{employee?.id ?? "—"}</span>
+                              </div>
                             </div>
 
-                            <div className="mobile-employee-details">
-
-                              <div>
-                                <Mail size={15} />
-                                <span>
-                                  {email}
-                                </span>
-                              </div>
-
-                              <div>
-                                <UserX size={15} />
-                                <span className={`mobile-rejected-count ${(Number(employee?.rejected_request_count) || 0) > 0 ? "has-rejections" : ""}`}>
-                                  Rejected requests: {Number(employee?.rejected_request_count) || 0}
-                                </span>
-                              </div>
-
-                              <div>
-                                <CalendarDays
-                                  size={15}
-                                />
-                                <span>
-                                  Registered{" "}
-                                  {formatDate(
-                                    employee?.created_at ||
-                                      employee?.createdAt
-                                  )}
-                                </span>
-                              </div>
-
-                            </div>
-
-                            <button
-                              type="button"
-                              className="mobile-view-btn"
-                              onClick={() =>
-                                viewEmployee(
-                                  employee
-                                )
+                            <span
+                              className={
+                                active
+                                  ? "status active"
+                                  : "status inactive"
                               }
                             >
-                              <Eye size={16} />
-                              View Employee
-                            </button>
-
+                              <span className="status-dot" />
+                              {active ? "Active" : "Inactive"}
+                            </span>
                           </div>
-                        );
-                      }
-                    )}
 
+                          <div className="mobile-employee-details">
+                            <div>
+                              <Mail size={15} />
+                              <span>{email}</span>
+                            </div>
+
+                            <div>
+                              <UserX size={15} />
+                              <span
+                                className={`mobile-rejected-count ${
+                                  (Number(employee?.rejected_request_count) ||
+                                    0) > 0
+                                    ? "has-rejections"
+                                    : ""
+                                }`}
+                              >
+                                Rejected requests:{" "}
+                                {Number(employee?.rejected_request_count) ||
+                                  0}
+                              </span>
+                            </div>
+
+                            <div>
+                              <CalendarDays size={15} />
+                              <span>
+                                Registered{" "}
+                                {formatDate(
+                                  employee?.created_at ||
+                                    employee?.createdAt
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="mobile-view-btn"
+                            onClick={() => viewEmployee(employee)}
+                          >
+                            <Eye size={16} />
+                            View Employee
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`mobile-toggle-employee-btn ${
+                              active ? "deactivate" : "activate"
+                            }`}
+                            onClick={() =>
+                              toggleEmployeeStatus(employee)
+                            }
+                            disabled={updating}
+                          >
+                            {updating ? (
+                              <Loader2
+                                size={16}
+                                className="rotate-icon"
+                              />
+                            ) : active ? (
+                              <UserX size={16} />
+                            ) : (
+                              <UserCheck size={16} />
+                            )}
+
+                            {updating
+                              ? "Updating..."
+                              : active
+                              ? "Deactivate Account"
+                              : "Activate Account"}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}
-
             </div>
 
-            {/* =================================================
-                FOOTER
-            ================================================= */}
-
+            {/* FOOTER */}
             {employees.length > 0 && (
               <div className="employees-footer">
-
                 <div>
                   <UserCheck size={17} />
-
-                  <span>
-                    {activeCount} active
-                  </span>
+                  <span>{activeCount} active</span>
                 </div>
 
                 <div>
                   <UserX size={17} />
-
-                  <span>
-                    {inactiveCount} inactive
-                  </span>
+                  <span>{inactiveCount} inactive</span>
                 </div>
 
                 <div>
                   <ShieldCheck size={17} />
-
                   <span>
-                    Employee accounts are
-                    managed through registration.
+                    Employee accounts are managed by administrators.
                   </span>
                 </div>
-
               </div>
             )}
-
           </>
         )}
-
       </div>
     </div>
   );

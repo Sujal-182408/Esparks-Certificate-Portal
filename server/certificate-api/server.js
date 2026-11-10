@@ -3,7 +3,7 @@
 // Backend API Server - ES Modules
 // Express + PostgreSQL + Socket.IO
 // ============================================================
-
+import crypto from "crypto";
 import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
@@ -78,7 +78,6 @@ function escapeEmailHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-
 async function sendCertificateStatusEmail({
   to,
   employeeName,
@@ -102,7 +101,7 @@ async function sendCertificateStatusEmail({
   const safeCourse = escapeEmailHtml(courseName || "your course");
   const safeCertificateNo = escapeEmailHtml(certificateNo || "");
   const safeReason = escapeEmailHtml(
-    rejectionReason || "Please contact the administrator for more information."
+    rejectionReason || "Please contact the administrator for more information.",
   );
 
   const clientUrl = (process.env.CLIENT_URL || CLIENT_URL).replace(/\/+$/, "");
@@ -183,7 +182,6 @@ eSparks IT Solutions`;
   return true;
 }
 
-
 async function sendCertificateStatusEmailSafely(details) {
   try {
     console.log("[CERTIFICATE EMAIL] Sending:", {
@@ -193,7 +191,7 @@ async function sendCertificateStatusEmailSafely(details) {
     });
 
     const sent = await sendCertificateStatusEmail(details);
-console.log("[REJECTION] Sending rejection email now...");
+    // console.log("[REJECTION] Sending rejection email now...");
 
     if (!sent) {
       console.error("[CERTIFICATE EMAIL] Email was skipped:", {
@@ -204,20 +202,18 @@ console.log("[REJECTION] Sending rejection email now...");
     }
 
     console.log(
-      `[CERTIFICATE EMAIL] Successfully sent ${details.status} email to ${details.to}`
+      `[CERTIFICATE EMAIL] Successfully sent ${details.status} email to ${details.to}`,
     );
 
     return true;
   } catch (error) {
     console.error(
       `[CERTIFICATE EMAIL] Failed to send ${details.status} email:`,
-      error
+      error,
     );
     return false;
   }
 }
-
-
 
 // Notify the administrator when an employee submits a certificate request.
 async function sendAdminCertificateRequestEmail({ employee, request }) {
@@ -239,21 +235,21 @@ async function sendAdminCertificateRequestEmail({ employee, request }) {
   const submittedAt = escapeEmailHtml(
     request.created_at || new Date().toISOString(),
   );
-try {
-  console.log("Sending admin certificate notification...");
-  console.log("Admin notification recipient:", to);
+  try {
+    console.log("Sending admin certificate notification...");
+    console.log("Admin notification recipient:", to);
 
-  await sendGmailEmail({
-    to: String(to).trim(),
-    subject: `New Certificate Request #${request.id} — ${employee.name || "Employee"}`,
-    text: `A new certificate request is waiting for review.\n\nRequest ID: ${request.id}\nEmployee: ${employee.name || "Employee"}\nEmployee email: ${employee.email || "Not provided"}\nCertificate type: ${request.certificate_type || "Not specified"}\nCourse: ${request.course_name || "Not specified"}\nDuration: ${request.duration_months ? `${request.duration_months} month(s)` : "Not applicable"}\nAdditional details: ${request.additional_details || "None"}\nStatus: pending\n\nReview request (admin login required): ${loginUrl}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033;line-height:1.6"><div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff"><h2 style="margin:0;color:#67e8f9">New Certificate Request</h2><p style="margin:6px 0 0">eSparks IT Solutions Certificate Portal</p></div><div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px"><p>A new employee certificate request is waiting for your review.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Request ID</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeEmailHtml(request.id)}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee email</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeEmail}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Certificate type</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${certificateType}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Course</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${courseName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Duration</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${duration}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Submitted</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${submittedAt}</td></tr><tr><td style="padding:8px;vertical-align:top"><strong>Additional details</strong></td><td style="padding:8px;white-space:pre-wrap">${details}</td></tr></table><p style="margin:24px 0"><a href="${escapeEmailHtml(loginUrl)}" style="display:inline-block;background:#0891b2;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Review Request</a></p><p style="color:#64748b;font-size:13px">For security, this button opens the admin login page first. Sign in to review the request. The email link does not approve or issue a certificate by itself.</p><p>Regards,<br><strong>Certificate Management System</strong></p></div></div>`,
-  });
+    await sendGmailEmail({
+      to: String(to).trim(),
+      subject: `New Certificate Request #${request.id} — ${employee.name || "Employee"}`,
+      text: `A new certificate request is waiting for review.\n\nRequest ID: ${request.id}\nEmployee: ${employee.name || "Employee"}\nEmployee email: ${employee.email || "Not provided"}\nCertificate type: ${request.certificate_type || "Not specified"}\nCourse: ${request.course_name || "Not specified"}\nDuration: ${request.duration_months ? `${request.duration_months} month(s)` : "Not applicable"}\nAdditional details: ${request.additional_details || "None"}\nStatus: pending\n\nReview request (admin login required): ${loginUrl}`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#172033;line-height:1.6"><div style="background:#0b1728;padding:24px;border-radius:14px 14px 0 0;color:#fff"><h2 style="margin:0;color:#67e8f9">New Certificate Request</h2><p style="margin:6px 0 0">eSparks IT Solutions Certificate Portal</p></div><div style="border:1px solid #dbe3ee;border-top:0;padding:24px;border-radius:0 0 14px 14px"><p>A new employee certificate request is waiting for your review.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Request ID</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${escapeEmailHtml(request.id)}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Employee email</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${employeeEmail}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Certificate type</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${certificateType}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Course</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${courseName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Duration</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${duration}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>Submitted</strong></td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${submittedAt}</td></tr><tr><td style="padding:8px;vertical-align:top"><strong>Additional details</strong></td><td style="padding:8px;white-space:pre-wrap">${details}</td></tr></table><p style="margin:24px 0"><a href="${escapeEmailHtml(loginUrl)}" style="display:inline-block;background:#0891b2;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Review Request</a></p><p style="color:#64748b;font-size:13px">For security, this button opens the admin login page first. Sign in to review the request. The email link does not approve or issue a certificate by itself.</p><p>Regards,<br><strong>Certificate Management System</strong></p></div></div>`,
+    });
 
-  console.log("Admin notification email sent successfully.");
-} catch (error) {
-  console.error("Admin notification email failed:", error);
-}
+    console.log("Admin notification email sent successfully.");
+  } catch (error) {
+    console.error("Admin notification email failed:", error);
+  }
 }
 
 async function sendAdminCertificateRequestEmailSafely(details) {
@@ -263,6 +259,115 @@ async function sendAdminCertificateRequestEmailSafely(details) {
     console.error("Admin certificate request email failed:", error.message);
   }
 }
+
+
+async function sendEmployeeAccountStatusEmailsSafely({
+  employee,
+  isActive,
+  changedBy = "Administrator",
+}) {
+  const status = isActive ? "Activated" : "Deactivated";
+  const adminEmail = String(
+    process.env.ADMIN_EMAIL || "nsujalkant@gmail.com"
+  ).trim();
+
+  const employeeName = employee.name || "Employee";
+  const employeeEmail = String(employee.email || "").trim();
+
+  if (!employeeEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employeeEmail)) {
+    console.error("[EMAIL FAILED] Invalid employee email:", employeeEmail);
+    return {
+      employeeEmailSent: false,
+      adminEmailSent: false,
+      employeeError: "Invalid employee email address.",
+    };
+  }
+
+  const employeeMessage = `Hello ${employeeName},
+
+Your eSparks Certificate Portal account has been ${status.toLowerCase()}.
+
+Updated by: ${changedBy}
+
+${
+  isActive
+    ? "You can now log in to your employee account."
+    : "Your login access has been suspended. Please contact the administrator."
+}`;
+
+  const employeeHtml = `
+    <h2>Account ${status}</h2>
+    <p>Hello ${escapeEmailHtml(employeeName)},</p>
+    <p>Your account has been ${status.toLowerCase()}.</p>
+    <p>Updated by: ${escapeEmailHtml(changedBy)}</p>
+  `;
+
+  const adminMessage = `Employee: ${employeeName}
+Email: ${employeeEmail}
+Status: ${status}
+Updated by: ${changedBy}`;
+
+  const adminHtml = `
+    <h2>Employee Account ${status}</h2>
+    <p>Employee: ${escapeEmailHtml(employeeName)}</p>
+    <p>Email: ${escapeEmailHtml(employeeEmail)}</p>
+    <p>Status: ${status}</p>
+  `;
+
+  const emailJobs = [
+    {
+      name: "EMPLOYEE",
+      to: employeeEmail,
+      subject: `Your eSparks account has been ${status.toLowerCase()}`,
+      text: employeeMessage,
+      html: employeeHtml,
+    },
+    {
+      name: "ADMIN",
+      to: adminEmail,
+      subject: `Employee Account ${status} — ${employeeName}`,
+      text: adminMessage,
+      html: adminHtml,
+    },
+  ];
+
+  const results = await Promise.allSettled(
+    emailJobs.map(async (mail) => {
+      console.log(`[EMAIL] Sending ${mail.name} email to: ${mail.to}`);
+
+      const result = await sendGmailEmail({
+        to: mail.to,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+      });
+
+      console.log(`[EMAIL SUCCESS] ${mail.name}:`, {
+        accepted: result.accepted,
+        rejected: result.rejected,
+        messageId: result.messageId,
+      });
+
+      return result;
+    })
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(
+        `[EMAIL FAILED] ${emailJobs[index].name}:`,
+        result.reason
+      );
+    }
+  });
+
+  return {
+    employeeEmailSent: results[0].status === "fulfilled",
+    adminEmailSent: results[1].status === "fulfilled",
+  };
+}
+
+
 // ============================================================
 // 7. CORS CONFIGURATION
 // ============================================================
@@ -542,6 +647,113 @@ app.get("/api/admin/employees/:id", requireAdmin, async (req, res, next) => {
     return next(error);
   }
 });
+
+// ============================================================
+// 20A. UPDATE EMPLOYEE ACTIVE / INACTIVE STATUS
+// ============================================================
+
+app.patch(
+  "/api/admin/employees/:id/status",
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const employeeId = Number(req.params.id);
+      const { is_active } = req.body || {};
+
+      if (!Number.isSafeInteger(employeeId) || employeeId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid employee ID.",
+        });
+      }
+
+      if (typeof is_active !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "is_active must be a boolean.",
+        });
+      }
+
+      // Get existing employee status
+      const existingResult = await pool.query(
+        `
+          SELECT id, name, email, is_active
+          FROM employee_users
+          WHERE id = $1
+        `,
+        [employeeId],
+      );
+
+      if (!existingResult.rows.length) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found.",
+        });
+      }
+
+      const existingEmployee = existingResult.rows[0];
+
+      // Avoid unnecessary updates and duplicate emails
+      if (existingEmployee.is_active === is_active) {
+        return res.status(200).json({
+          success: true,
+          message: `Employee account is already ${
+            is_active ? "active" : "deactivated"
+          }.`,
+          employee: existingEmployee,
+          emailNotifications: {
+            sent: false,
+            reason: "Status has not changed.",
+          },
+        });
+      }
+
+      // Update employee status
+      const result = await pool.query(
+        `
+          UPDATE employee_users
+          SET is_active = $1
+          WHERE id = $2
+          RETURNING id, name, email, is_active
+        `,
+        [is_active, employeeId],
+      );
+
+      const updatedEmployee = result.rows[0];
+
+      // Send email notification safely
+      let emailNotifications = null;
+
+      try {
+        emailNotifications = await sendEmployeeAccountStatusEmailsSafely({
+          employee: updatedEmployee,
+          isActive: is_active,
+          changedBy: req.admin?.email || "Administrator",
+        });
+      } catch (emailError) {
+        // Email failure must not affect the database update
+        console.error("Employee status email notification error:", emailError);
+
+        emailNotifications = {
+          sent: false,
+          error: "Employee status updated, but email notification failed.",
+        };
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Employee account ${
+          is_active ? "activated" : "deactivated"
+        } successfully.`,
+        employee: updatedEmployee,
+        emailNotifications,
+      });
+    } catch (error) {
+      console.error("Update employee status error:", error);
+      next(error);
+    }
+  },
+);
 
 // ============================================================
 // 21. GET ALL CERTIFICATES
@@ -1055,6 +1267,7 @@ app.post("/api/admin/certificates", requireAdmin, async (req, res, next) => {
       );
     }
 
+
     // ========================================================
     // 14. AUDIT LOG
     // ========================================================
@@ -1300,51 +1513,199 @@ app.put("/api/admin/certificates/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
+// ===================================
+// ===================================
+
+async function sendCertificateRevocationEmailsSafely({
+  employee,
+  certificate,
+  reason,
+  adminEmail,
+  revokedBy,
+}) {
+  const employeeName = employee?.name || "Employee";
+  const employeeEmail = String(employee?.email || "").trim();
+  const adminRecipient = String(adminEmail || "").trim();
+
+  const certificateNumber =
+    certificate?.certificate_no || "N/A";
+
+  const results = {
+    employeeEmailSent: false,
+    adminEmailSent: false,
+  };
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+
+  const employeeHtml = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#1e293b;">
+      <h2 style="color:#dc2626;">Certificate Revoked</h2>
+      <p>Hello ${escapeHtml(employeeName)},</p>
+      <p>Your certificate has been revoked by the administrator.</p>
+      <p><strong>Certificate Number:</strong> ${escapeHtml(certificateNumber)}</p>
+      <p><strong>Reason:</strong> ${escapeHtml(reason)}</p>
+      <p>If you have questions, please contact the administrator.</p>
+      <p>Regards,<br/>eSparks IT Solutions</p>
+    </div>
+  `;
+
+  const adminHtml = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#1e293b;">
+      <h2 style="color:#dc2626;">Certificate Revocation Notification</h2>
+      <p>A certificate has been revoked.</p>
+      <p><strong>Employee:</strong> ${escapeHtml(employeeName)}</p>
+      <p><strong>Employee Email:</strong> ${escapeHtml(employeeEmail || "Unavailable")}</p>
+      <p><strong>Certificate Number:</strong> ${escapeHtml(certificateNumber)}</p>
+      <p><strong>Reason:</strong> ${escapeHtml(reason)}</p>
+      <p><strong>Revoked By:</strong> ${escapeHtml(revokedBy)}</p>
+    </div>
+  `;
+
+  const emailTasks = [];
+
+  if (employeeEmail) {
+    emailTasks.push({
+      type: "employee",
+      to: employeeEmail,
+      subject: `Certificate Revoked — ${certificateNumber}`,
+      text: `Hello ${employeeName},
+
+Your certificate ${certificateNumber} has been revoked.
+
+Reason: ${reason}
+
+Regards,
+eSparks IT Solutions`,
+      html: employeeHtml,
+    });
+  } else {
+    console.warn("[CERTIFICATE EMAIL] Employee email unavailable.");
+  }
+
+  if (adminRecipient) {
+    emailTasks.push({
+      type: "admin",
+      to: adminRecipient,
+      subject: `Certificate Revoked — ${certificateNumber}`,
+      text: `A certificate has been revoked.
+
+Employee: ${employeeName}
+Employee Email: ${employeeEmail || "Unavailable"}
+Certificate Number: ${certificateNumber}
+Reason: ${reason}
+Revoked By: ${revokedBy}`,
+      html: adminHtml,
+    });
+  } else {
+    console.error("[CERTIFICATE EMAIL] Admin email unavailable.");
+  }
+
+  const emailResults = await Promise.allSettled(
+    emailTasks.map(async (email) => {
+      console.log(
+        `[CERTIFICATE EMAIL] Sending revocation email to ${email.type}: ${email.to}`,
+      );
+
+      return sendGmailEmail({
+        to: email.to,
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+      });
+    }),
+  );
+
+  emailResults.forEach((result, index) => {
+    const type = emailTasks[index].type;
+
+    if (result.status === "fulfilled") {
+      results[
+        type === "employee"
+          ? "employeeEmailSent"
+          : "adminEmailSent"
+      ] = true;
+
+      console.log(
+        `[CERTIFICATE EMAIL] Successfully sent revocation email to ${emailTasks[index].to}`,
+      );
+    } else {
+      console.error(
+        `[CERTIFICATE EMAIL] Failed to send ${type} revocation email:`,
+        result.reason,
+      );
+    }
+  });
+
+  return results;
+}
+
+
 // ============================================================
 // 25. REVOKE CERTIFICATE
 // ============================================================
+
+
 
 app.patch(
   "/api/admin/certificates/:id/revoke",
   requireAdmin,
   async (req, res, next) => {
     const client = await pool.connect();
-
     let transactionStarted = false;
 
     try {
       const certificateId = Number(req.params.id);
+      const {
+        reason,
+        deactivateEmployee = false,
+      } = req.body || {};
+
+      const revocationReason =
+        typeof reason === "string" && reason.trim()
+          ? reason.trim()
+          : "Certificate revoked by administrator.";
 
       if (!Number.isInteger(certificateId) || certificateId <= 0) {
         return res.status(400).json({
           success: false,
-
           message: "Invalid certificate ID.",
         });
       }
 
-      await client.query("BEGIN");
+      if (typeof deactivateEmployee !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "deactivateEmployee must be a boolean.",
+        });
+      }
 
+      await client.query("BEGIN");
       transactionStarted = true;
 
+      // Fetch and lock certificate.
       const certificateResult = await client.query(
         `
-            SELECT *
-            FROM certificates
-            WHERE id = $1
-            FOR UPDATE
-          `,
+          SELECT *
+          FROM certificates
+          WHERE id = $1
+          FOR UPDATE
+        `,
         [certificateId],
       );
 
       if (certificateResult.rows.length === 0) {
         await client.query("ROLLBACK");
-
         transactionStarted = false;
 
         return res.status(404).json({
           success: false,
-
           message: "Certificate not found.",
         });
       }
@@ -1353,30 +1714,61 @@ app.patch(
 
       if (existingCertificate.status === "revoked") {
         await client.query("ROLLBACK");
-
         transactionStarted = false;
 
         return res.status(409).json({
           success: false,
-
           message: "Certificate is already revoked.",
         });
       }
 
+      // Fetch and lock employee.
+      let employee = null;
+      let employeeWasActive = false;
+
+      if (existingCertificate.employee_id) {
+        const employeeResult = await client.query(
+          `
+            SELECT id, name, email, is_active
+            FROM employee_users
+            WHERE id = $1
+            FOR UPDATE
+          `,
+          [existingCertificate.employee_id],
+        );
+
+        employee = employeeResult.rows[0] || null;
+        employeeWasActive = employee?.is_active === true;
+      }
+
+      // Revoke certificate.
       const result = await client.query(
         `
-            UPDATE certificates
-            SET
-              status = 'revoked',
-              revoked_at = CURRENT_TIMESTAMP
-            WHERE id = $1
-            RETURNING *
-          `,
+          UPDATE certificates
+          SET
+            status = 'revoked',
+            revoked_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+          RETURNING *
+        `,
         [certificateId],
       );
 
       const certificate = result.rows[0];
 
+      // Deactivate employee only when checkbox is checked.
+      if (deactivateEmployee && employee && employeeWasActive) {
+        await client.query(
+          `
+            UPDATE employee_users
+            SET is_active = false
+            WHERE id = $1
+          `,
+          [employee.id],
+        );
+      }
+
+      // Save audit log.
       await client.query(
         `
           INSERT INTO certificate_audit_logs
@@ -1386,69 +1778,137 @@ app.patch(
             performed_by,
             details
           )
-          VALUES
-          (
-            $1,
-            'CERTIFICATE_REVOKED',
-            $2,
-            $3::jsonb
-          )
+          VALUES ($1, 'CERTIFICATE_REVOKED', $2, $3::jsonb)
         `,
         [
           certificateId,
-
           req.admin?.email || "admin",
-
           JSON.stringify({
-            reason: req.body?.reason || "Certificate revoked by administrator.",
+            reason: revocationReason,
+            employeeDeactivated:
+              Boolean(deactivateEmployee && employee && employeeWasActive),
           }),
         ],
       );
 
+      // Create employee notification.
       let notification = null;
 
       if (existingCertificate.employee_id) {
         notification = await createNotification(client, {
           recipientType: "employee",
-
           recipientId: existingCertificate.employee_id,
-
           type: "CERTIFICATE_REVOKED",
-
           title: "Certificate Revoked",
-
           message: `Your certificate ${existingCertificate.certificate_no} has been revoked by the administrator.`,
-
-          certificateId: certificateId,
+          certificateId,
         });
       }
 
+      // Commit database changes.
       await client.query("COMMIT");
-
       transactionStarted = false;
 
+      // Emit notification after successful commit.
       if (notification && existingCertificate.employee_id) {
-        emitEmployeeNotification(existingCertificate.employee_id, notification);
+        try {
+          emitEmployeeNotification(
+            existingCertificate.employee_id,
+            notification,
+          );
+        } catch (notificationError) {
+          console.error(
+            "[REVOKE] Notification emission error:",
+            notificationError,
+          );
+        }
+      }
+
+      // Email configuration.
+      const adminEmail = String(
+        process.env.ADMIN_EMAIL || "nsujalkant@gmail.com",
+      ).trim();
+
+      const revokedBy = req.admin?.email || "Administrator";
+
+      const emailNotifications = {
+        revocation: {
+          employeeEmailSent: false,
+          adminEmailSent: false,
+        },
+        accountDeactivation: {
+          employeeEmailSent: false,
+          adminEmailSent: false,
+        },
+      };
+
+      // Always send certificate revocation emails.
+      // Employee email is sent when an employee record exists.
+      // Admin notification can also be sent when only certificate details exist.
+      try {
+        emailNotifications.revocation =
+          await sendCertificateRevocationEmailsSafely({
+            employee: employee || {
+              name: existingCertificate.employee_name || "Employee",
+              email: existingCertificate.employee_email || null,
+            },
+            certificate,
+            reason: revocationReason,
+            adminEmail,
+            revokedBy,
+          });
+      } catch (emailError) {
+        console.error(
+          "[REVOKE] Certificate revocation email error:",
+          emailError,
+        );
+      }
+
+      // Send account deactivation emails only when:
+      // 1. Checkbox was checked.
+      // 2. Employee exists.
+      // 3. Employee was previously active.
+      if (deactivateEmployee && employee && employeeWasActive) {
+        try {
+          emailNotifications.accountDeactivation =
+            await sendEmployeeAccountStatusEmailsSafely({
+              employee,
+              isActive: false,
+              changedBy: revokedBy,
+            });
+        } catch (emailError) {
+          console.error(
+            "[REVOKE] Employee deactivation email error:",
+            emailError,
+          );
+        }
       }
 
       return res.status(200).json({
         success: true,
-
-        message: "Certificate revoked successfully.",
-
+        message:
+          deactivateEmployee && employee && employeeWasActive
+            ? "Certificate revoked and employee account deactivated successfully."
+            : "Certificate revoked successfully.",
         certificate,
+        employeeDeactivated: Boolean(
+          deactivateEmployee && employee && employeeWasActive,
+        ),
+        emailNotifications,
       });
     } catch (error) {
       if (transactionStarted) {
         try {
           await client.query("ROLLBACK");
         } catch (rollbackError) {
-          console.error("Revoke rollback error:", rollbackError);
+          console.error(
+            "[REVOKE] Rollback error:",
+            rollbackError,
+          );
         }
       }
 
-      console.error("Revoke certificate error:", error);
-
+      console.error("[REVOKE] Certificate revocation error:", error);
       next(error);
     } finally {
       client.release();
@@ -1456,134 +1916,383 @@ app.patch(
   },
 );
 
+
+
 // ============================================================
-// 26. DELETE CERTIFICATE
+// 26. DELETE CERTIFICATE PERMANENTLY
 // ============================================================
 
-app.delete(
-  "/api/admin/certificates/:id",
+app.post(
+  "/api/admin/certificates/:id/delete-otp",
   requireAdmin,
   async (req, res, next) => {
-    const client = await pool.connect();
-
-    let transactionStarted = false;
-
     try {
       const certificateId = Number(req.params.id);
+      const adminId = Number(req.admin?.id);
+      const adminEmail = String(req.admin?.email || "").trim().toLowerCase();
 
-      if (!Number.isInteger(certificateId) || certificateId <= 0) {
+      if (!Number.isSafeInteger(certificateId) || certificateId <= 0) {
         return res.status(400).json({
           success: false,
-
           message: "Invalid certificate ID.",
         });
       }
 
-      await client.query("BEGIN");
+      if (!Number.isSafeInteger(adminId) || adminId <= 0 || !adminEmail) {
+        return res.status(401).json({
+          success: false,
+          message: "Admin authentication details are missing.",
+        });
+      }
 
-      transactionStarted = true;
-
-      const certificateResult = await client.query(
-        `
-            SELECT
-              id,
-              status,
-              certificate_no
-            FROM certificates
-            WHERE id = $1
-            FOR UPDATE
-          `,
-        [certificateId],
+      const certificateResult = await pool.query(
+        `SELECT id, certificate_no, recipient_name, course_name, status
+         FROM certificates
+         WHERE id = $1`,
+        [certificateId]
       );
 
-      if (certificateResult.rows.length === 0) {
-        await client.query("ROLLBACK");
+      if (!certificateResult.rowCount) {
+        return res.status(404).json({
+          success: false,
+          message: "Certificate not found.",
+        });
+      }
 
+      const previousOtp = await pool.query(
+        `SELECT last_sent_at
+         FROM certificate_delete_otps
+         WHERE admin_id = $1
+           AND certificate_id = $2
+           AND consumed_at IS NULL
+           AND expires_at > NOW()
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [adminId, certificateId]
+      );
+
+      if (previousOtp.rowCount) {
+        const lastSentAt = new Date(previousOtp.rows[0].last_sent_at).getTime();
+        const remaining = Math.ceil((60000 - (Date.now() - lastSentAt)) / 1000);
+
+        if (remaining > 0) {
+          return res.status(429).json({
+            success: false,
+            message: `Please wait ${remaining} seconds before requesting another OTP.`,
+          });
+        }
+      }
+
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      const challengeId = crypto.randomUUID();
+      const otpHash = crypto
+        .createHash("sha256")
+        .update(`${challengeId}:${otp}`)
+        .digest("hex");
+
+      await pool.query(
+        `UPDATE certificate_delete_otps
+         SET consumed_at = NOW()
+         WHERE admin_id = $1
+           AND certificate_id = $2
+           AND consumed_at IS NULL`,
+        [adminId, certificateId]
+      );
+
+      await pool.query(
+        `INSERT INTO certificate_delete_otps
+          (id, admin_id, admin_email, certificate_id, otp_hash, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '5 minutes')`,
+        [challengeId, adminId, adminEmail, certificateId, otpHash]
+      );
+
+      const certificate = certificateResult.rows[0];
+
+      try {
+        await sendGmailEmail({
+          to: adminEmail,
+          subject: "Certificate Deletion Verification OTP",
+          text: `Your OTP to delete certificate ${certificate.certificate_no || `#${certificate.id}`} is ${otp}. It expires in 5 minutes. If you did not request this, ignore this email.`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#17212b">
+              <h2>Certificate Deletion Verification</h2>
+              <p>A deletion request was made for this certificate:</p>
+              <p><strong>Certificate:</strong> ${String(certificate.certificate_no || certificate.id)}</p>
+              <p><strong>Recipient:</strong> ${String(certificate.recipient_name || "N/A")}</p>
+              <p><strong>Course:</strong> ${String(certificate.course_name || "N/A")}</p>
+              <p style="font-size:30px;font-weight:bold;letter-spacing:8px">${otp}</p>
+              <p>This OTP expires in <strong>5 minutes</strong> and can only be used once.</p>
+              <p>If you did not request this deletion, please ignore this email.</p>
+            </div>
+          `,
+        });
+      } catch (emailError) {
+        await pool.query(
+          `UPDATE certificate_delete_otps
+           SET consumed_at = NOW()
+           WHERE id = $1`,
+          [challengeId]
+        );
+        throw emailError;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Verification OTP sent to ${adminEmail}.`,
+        challengeId,
+        expiresIn: 300,
+        resendAfter: 60,
+      });
+    } catch (error) {
+      console.error("Certificate deletion OTP error:", error);
+      next(error);
+    }
+  }
+);
+
+//=============================================================
+// 26.A Delete Verification
+//=============================================================
+
+ app.post(
+  "/api/admin/certificates/:id/confirm-delete",
+  requireAdmin,
+  async (req, res, next) => {
+    const client = await pool.connect();
+    let transactionStarted = false;
+
+    try {
+      const certificateId = Number(req.params.id);
+      const adminId = Number(req.admin?.id);
+      const adminEmail = String(req.admin?.email || "").trim().toLowerCase();
+      const { challengeId, otp } = req.body || {};
+
+      if (!Number.isSafeInteger(certificateId) || certificateId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid certificate ID.",
+        });
+      }
+
+      if (!Number.isSafeInteger(adminId) || adminId <= 0 || !adminEmail) {
+        return res.status(401).json({
+          success: false,
+          message: "Admin authentication details are missing.",
+        });
+      }
+
+      if (
+        typeof challengeId !== "string" ||
+        !/^[0-9a-f-]{36}$/i.test(challengeId) ||
+        typeof otp !== "string" ||
+        !/^\d{6}$/.test(otp)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "A valid verification OTP is required.",
+        });
+      }
+
+      await client.query("BEGIN");
+      transactionStarted = true;
+
+      const otpResult = await client.query(
+        `SELECT *
+         FROM certificate_delete_otps
+         WHERE id = $1
+           AND admin_id = $2
+           AND admin_email = $3
+           AND certificate_id = $4
+         FOR UPDATE`,
+        [challengeId, adminId, adminEmail, certificateId]
+      );
+
+      if (!otpResult.rowCount) {
+        await client.query("ROLLBACK");
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: "Invalid verification request. Please request a new OTP.",
+        });
+      }
+
+      const otpRecord = otpResult.rows[0];
+
+      if (otpRecord.consumed_at) {
+        await client.query("ROLLBACK");
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: "This OTP has already been used. Request a new OTP.",
+        });
+      }
+
+      if (new Date(otpRecord.expires_at).getTime() <= Date.now()) {
+        await client.query(
+          `UPDATE certificate_delete_otps
+           SET consumed_at = NOW()
+           WHERE id = $1`,
+          [challengeId]
+        );
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+
+        return res.status(400).json({
+          success: false,
+          message: "OTP has expired. Please request a new OTP.",
+        });
+      }
+
+      if (otpRecord.attempts >= 5) {
+        await client.query(
+          `UPDATE certificate_delete_otps
+           SET consumed_at = NOW()
+           WHERE id = $1`,
+          [challengeId]
+        );
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+
+        return res.status(429).json({
+          success: false,
+          message: "Maximum OTP attempts reached. Request a new OTP.",
+        });
+      }
+
+      const submittedHash = crypto
+        .createHash("sha256")
+        .update(`${challengeId}:${otp}`)
+        .digest("hex");
+
+      const storedHash = Buffer.from(otpRecord.otp_hash, "hex");
+      const submittedBuffer = Buffer.from(submittedHash, "hex");
+      const isValidOtp =
+        storedHash.length === submittedBuffer.length &&
+        crypto.timingSafeEqual(storedHash, submittedBuffer);
+
+      if (!isValidOtp) {
+        const nextAttempts = otpRecord.attempts + 1;
+
+        await client.query(
+          `UPDATE certificate_delete_otps
+           SET attempts = $1,
+               consumed_at = CASE WHEN $1 >= 5 THEN NOW() ELSE consumed_at END
+           WHERE id = $2`,
+          [nextAttempts, challengeId]
+        );
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+
+        return res.status(nextAttempts >= 5 ? 429 : 400).json({
+          success: false,
+          message:
+            nextAttempts >= 5
+              ? "Maximum OTP attempts reached. Request a new OTP."
+              : `Incorrect OTP. ${5 - nextAttempts} attempts remaining.`,
+        });
+      }
+
+      const certificateResult = await client.query(
+        `SELECT id, certificate_no, certificate_type, employee_id,
+                recipient_name, course_name, issuer_name, issue_date, status
+         FROM certificates
+         WHERE id = $1
+         FOR UPDATE`,
+        [certificateId]
+      );
+
+      if (!certificateResult.rowCount) {
+        await client.query(
+          `UPDATE certificate_delete_otps
+           SET consumed_at = NOW()
+           WHERE id = $1`,
+          [challengeId]
+        );
+
+        await client.query("COMMIT");
         transactionStarted = false;
 
         return res.status(404).json({
           success: false,
-
           message: "Certificate not found.",
         });
       }
 
       const certificate = certificateResult.rows[0];
 
-      if (certificate.status === "issued") {
-        await client.query("ROLLBACK");
+      // Preserve audit records while removing their FK reference.
+      await client.query(
+        `UPDATE certificate_audit_logs
+         SET certificate_id = NULL
+         WHERE certificate_id = $1`,
+        [certificateId]
+      );
 
-        transactionStarted = false;
+      // certificate_requests and notifications use ON DELETE SET NULL.
+      const deleteResult = await client.query(
+        `DELETE FROM certificates
+         WHERE id = $1
+         RETURNING id, certificate_no`,
+        [certificateId]
+      );
 
-        return res.status(409).json({
-          success: false,
-
-          message:
-            "Issued certificates cannot be deleted. Revoke the certificate instead.",
-        });
+      if (!deleteResult.rowCount) {
+        throw new Error("Certificate deletion failed.");
       }
 
       await client.query(
-        `
-          DELETE FROM certificates
-          WHERE id = $1
-        `,
-        [certificateId],
+        `INSERT INTO certificate_audit_logs
+          (certificate_id, action, performed_by, details)
+         VALUES (NULL, 'CERTIFICATE_DELETED', $1, $2::jsonb)`,
+        [
+          adminEmail,
+          JSON.stringify({
+            certificate_id: certificate.id,
+            certificate_no: certificate.certificate_no,
+            certificate_type: certificate.certificate_type,
+            employee_id: certificate.employee_id,
+            recipient_name: certificate.recipient_name,
+            course_name: certificate.course_name,
+            issuer_name: certificate.issuer_name,
+            issue_date: certificate.issue_date,
+            previous_status: certificate.status,
+            deleted_by: adminEmail,
+            deleted_at: new Date().toISOString(),
+          }),
+        ]
       );
 
       await client.query(
-        `
-          INSERT INTO certificate_audit_logs
-          (
-            certificate_id,
-            action,
-            performed_by,
-            details
-          )
-          VALUES
-          (
-            NULL,
-            'CERTIFICATE_DELETED',
-            $1,
-            $2::jsonb
-          )
-        `,
-        [
-          req.admin?.email || "admin",
-
-          JSON.stringify({
-            certificate_id: certificateId,
-
-            certificate_no: certificate.certificate_no,
-          }),
-        ],
+        `UPDATE certificate_delete_otps
+         SET consumed_at = NOW()
+         WHERE id = $1`,
+        [challengeId]
       );
 
       await client.query("COMMIT");
-
       transactionStarted = false;
 
       return res.status(200).json({
         success: true,
-
-        message: "Certificate deleted successfully.",
+        message: "Certificate verified and deleted successfully.",
+        certificate: deleteResult.rows[0],
       });
     } catch (error) {
       if (transactionStarted) {
-        try {
-          await client.query("ROLLBACK");
-        } catch (rollbackError) {
-          console.error("Delete rollback error:", rollbackError);
-        }
+        await client.query("ROLLBACK").catch(() => {});
       }
 
-      console.error("Delete certificate error:", error);
-
+      console.error("Verified certificate deletion error:", error);
       next(error);
     } finally {
       client.release();
     }
-  },
+  }
 );
 
 // ============================================================
@@ -2676,7 +3385,7 @@ app.post(
       const request = requestResult.rows[0];
 
       console.log("[REJECTION] Employee email:", request.employee_email);
-console.log("[REJECTION] Employee name:", request.employee_name);
+      console.log("[REJECTION] Employee name:", request.employee_name);
 
       if (request.status !== "pending") {
         await client.query("ROLLBACK");
@@ -2891,47 +3600,311 @@ app.get("/api/verify/:token", verifyLimiter, async (req, res, next) => {
 
     const certificate = result.rows[0];
 
-    /* =====================================================
-         REVOKED CERTIFICATE
-      ===================================================== */
+    // ============================================================
+    // UPDATE EMPLOYEE ACTIVE / INACTIVE STATUS
+    // ============================================================
 
-    if (certificate.status !== "issued") {
-      return res.status(200).json({
-        success: true,
-        valid: false,
-        status: "revoked",
+    app.patch(
+      "/api/admin/employees/:id/status",
+      requireAdmin,
+      async (req, res, next) => {
+        try {
+          const employeeId = Number(req.params.id);
+          const { is_active } = req.body || {};
 
-        message: "This certificate has been revoked and is no longer valid.",
+          if (!Number.isSafeInteger(employeeId) || employeeId <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid employee ID.",
+            });
+          }
 
-        certificate: {
-          id: certificate.id,
+          if (typeof is_active !== "boolean") {
+            return res.status(400).json({
+              success: false,
+              message: "is_active must be a boolean.",
+            });
+          }
 
-          certificate_no: certificate.certificate_no,
+          const result = await pool.query(
+            `
+          UPDATE employee_users
+          SET is_active = $1
+          WHERE id = $2
+          RETURNING id, name, email, is_active
+        `,
+            [is_active, employeeId],
+          );
 
-          certificate_type: certificate.certificate_type,
+          if (!result.rows.length) {
+            return res.status(404).json({
+              success: false,
+              message: "Employee not found.",
+            });
+          }
 
-          employee_id: certificate.employee_id,
+          return res.status(200).json({
+            success: true,
+            message: `Employee account ${
+              is_active ? "activated" : "deactivated"
+            } successfully.`,
+            employee: result.rows[0],
+          });
+        } catch (error) {
+          console.error("Update employee status error:", error);
+          next(error);
+        }
+      },
+    );
 
-          recipient_name: certificate.recipient_name,
+    // ============================================================
+    // REVOKE CERTIFICATE + DEACTIVATE EMPLOYEE + EMAILS
+    // ============================================================
 
-          course_name: certificate.course_name,
+    app.patch(
+      "/api/admin/certificates/:id/revoke",
+      requireAdmin,
+      async (req, res, next) => {
+        let client;
+        let transactionStarted = false;
 
-          issuer_name: certificate.issuer_name,
+        try {
+          const certificateId = Number(req.params.id);
 
-          issue_date: certificate.issue_date,
+          if (!Number.isSafeInteger(certificateId) || certificateId <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid certificate ID.",
+            });
+          }
 
-          verification_token: certificate.verification_token,
+          const reason = String(
+            req.body?.reason || "Certificate revoked by administrator.",
+          ).trim();
 
-          duration_months: certificate.duration_months,
+          if (reason.length > 2000) {
+            return res.status(400).json({
+              success: false,
+              message: "Revocation reason must not exceed 2000 characters.",
+            });
+          }
 
-          status: "revoked",
+          const revokedBy = req.admin?.email || "admin";
 
-          created_at: certificate.created_at,
+          // 1. CONNECT TO DATABASE
+          client = await pool.connect();
 
-          revoked_at: certificate.revoked_at,
-        },
+          // 2. START TRANSACTION
+          await client.query("BEGIN");
+          transactionStarted = true;
+
+          // 3. GET CERTIFICATE AND EMPLOYEE DETAILS
+          const certificateResult = await client.query(
+            `
+          SELECT
+            c.*,
+            e.name AS employee_name,
+            e.email AS employee_email
+          FROM certificates c
+          LEFT JOIN employee_users e
+            ON e.id = c.employee_id
+          WHERE c.id = $1
+          FOR UPDATE OF c
+        `,
+            [certificateId],
+          );
+
+          if (!certificateResult.rows.length) {
+            return res.status(404).json({
+              success: false,
+              message: "Certificate not found.",
+            });
+          }
+
+          const existingCertificate = certificateResult.rows[0];
+
+          // 4. PREVENT DUPLICATE REVOCATION
+          if (existingCertificate.status === "revoked") {
+            return res.status(409).json({
+              success: false,
+              message: "Certificate is already revoked.",
+            });
+          }
+
+          // 5. REVOKE CERTIFICATE
+          const updateResult = await client.query(
+            `
+          UPDATE certificates
+          SET
+            status = 'revoked',
+            revoked_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+          RETURNING *
+        `,
+            [certificateId],
+          );
+
+          const certificate = {
+            ...updateResult.rows[0],
+            employee_id: existingCertificate.employee_id,
+            employee_name: existingCertificate.employee_name,
+            employee_email: existingCertificate.employee_email,
+          };
+
+          // 6. AUTOMATICALLY DEACTIVATE EMPLOYEE
+          let deactivatedEmployee = null;
+
+          if (existingCertificate.employee_id) {
+            const employeeUpdate = await client.query(
+              `
+            UPDATE employee_users
+            SET is_active = FALSE
+            WHERE id = $1
+            RETURNING id, name, email, is_active
+          `,
+              [existingCertificate.employee_id],
+            );
+
+            deactivatedEmployee = employeeUpdate.rows[0] || null;
+
+            if (!deactivatedEmployee) {
+              throw new Error("Employee account could not be updated.");
+            }
+          }
+
+          // 7. AUDIT LOG
+          await client.query(
+            `
+          INSERT INTO certificate_audit_logs
+          (
+            certificate_id,
+            action,
+            performed_by,
+            details
+          )
+          VALUES ($1, 'CERTIFICATE_REVOKED', $2, $3::jsonb)
+        `,
+            [
+              certificateId,
+              revokedBy,
+              JSON.stringify({
+                reason,
+                employee_id: existingCertificate.employee_id,
+                employee_name: existingCertificate.employee_name,
+                employee_email: existingCertificate.employee_email,
+                employee_deactivated: Boolean(deactivatedEmployee),
+                certificate_no: existingCertificate.certificate_no,
+              }),
+            ],
+          );
+
+          // 8. EMPLOYEE IN-APP NOTIFICATION
+          let notification = null;
+
+          if (existingCertificate.employee_id) {
+            notification = await createNotification(client, {
+              recipientType: "employee",
+              recipientId: existingCertificate.employee_id,
+              type: "CERTIFICATE_REVOKED",
+              title: "Certificate Revoked",
+              message: `Your certificate ${existingCertificate.certificate_no} has been revoked by the administrator. Your employee account has also been deactivated. Reason: ${reason}`,
+              certificateId,
+            });
+          }
+
+          // 9. COMMIT DATABASE TRANSACTION
+          await client.query("COMMIT");
+          transactionStarted = false;
+
+          // 10. REAL-TIME NOTIFICATION
+          if (notification && existingCertificate.employee_id) {
+            try {
+              emitEmployeeNotification(
+                existingCertificate.employee_id,
+                notification,
+              );
+            } catch (notificationError) {
+              console.error("Real-time notification error:", notificationError);
+            }
+          }
+
+          // 11. SEND EMPLOYEE AND ADMIN EMAILS
+          const emailNotifications = {
+  revocation: {
+    employeeEmailSent: false,
+    adminEmailSent: false,
+  },
+  accountDeactivation: {
+    employeeEmailSent: false,
+    adminEmailSent: false,
+  },
+};
+
+// Always send certificate revocation emails.
+try {
+  emailNotifications.revocation =
+    await sendCertificateRevocationEmailsSafely({
+      employee: employee || {
+        name: existingCertificate.employee_name,
+        email: existingCertificate.employee_email,
+      },
+      certificate,
+      reason: revocationReason,
+      adminEmail: process.env.ADMIN_EMAIL || "nsujalkant@gmail.com",
+      revokedBy,
+    });
+} catch (emailError) {
+  console.error(
+    "[REVOKE] Certificate revocation email error:",
+    emailError,
+  );
+}
+
+// Send account deactivation emails only when the checkbox was checked
+// and the employee was previously active.
+if (deactivateEmployee && employee && employeeWasActive) {
+  try {
+    emailNotifications.accountDeactivation =
+      await sendEmployeeAccountStatusEmailsSafely({
+        employee,
+        isActive: false,
+        changedBy: revokedBy,
       });
-    }
+  } catch (emailError) {
+    console.error(
+      "[REVOKE] Employee deactivation email error:",
+      emailError,
+    );
+  }
+}
+
+          // 12. SUCCESS RESPONSE
+          return res.status(200).json({
+            success: true,
+            message:
+              "Certificate revoked and employee account deactivated successfully.",
+            certificate,
+            employee: deactivatedEmployee,
+            emailNotifications: emailResults,
+          });
+        } catch (error) {
+          if (client && transactionStarted) {
+            try {
+              await client.query("ROLLBACK");
+            } catch (rollbackError) {
+              console.error("Revoke rollback error:", rollbackError);
+            }
+          }
+
+          console.error("Revoke certificate error:", error);
+          return next(error);
+        } finally {
+          if (client) {
+            client.release();
+          }
+        }
+      },
+    );
 
     /* =====================================================
          VALID / ISSUED CERTIFICATE

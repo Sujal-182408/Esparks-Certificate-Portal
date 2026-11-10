@@ -468,33 +468,25 @@ if (!validPassword(password)) {
 // POST /api/employee-auth/login
 // =====================================================
 
+
 router.post(
   "/login",
   loginLimiter,
   requireTrustedOrigin,
   async (req, res, next) => {
     try {
-      const email =
-        normalizeEmail(
-          req.body?.email
-        );
+      const email = normalizeEmail(req.body?.email);
+      const password = req.body?.password;
 
-      const password =
-        req.body?.password;
-
-      if (
-        !email ||
-        typeof password !== "string"
-      ) {
+      if (!email || typeof password !== "string") {
         return res.status(400).json({
-          message:
-            "Email and password are required.",
+          success: false,
+          message: "Email and password are required.",
         });
       }
 
-      const result =
-        await pool.query(
-          `
+      const result = await pool.query(
+        `
           SELECT
             id,
             name,
@@ -504,67 +496,68 @@ router.post(
           FROM employee_users
           WHERE LOWER(email) = $1
           LIMIT 1
-          `,
-          [email]
-        );
+        `,
+        [email]
+      );
 
-      const employee =
-        result.rows[0];
+      const employee = result.rows[0];
 
-      if (
-        !employee ||
-        !employee.is_active ||
-        !employee.password_hash
-      ) {
+      // 1. Check employee existence
+      if (!employee || !employee.password_hash) {
         return res.status(401).json({
-          message:
-            "Invalid email or password.",
+          success: false,
+          message: "Invalid email or password.",
         });
       }
 
-      const passwordMatch =
-        await bcrypt.compare(
-          password,
-          employee.password_hash
-        );
+      // 2. Check suspended account BEFORE password authentication
+      if (!employee.is_active) {
+        return res.status(403).json({
+          success: false,
+          code: "ACCOUNT_SUSPENDED",
+          message:
+            "Your account has been suspended. Please contact the administrator for assistance.",
+        });
+      }
+
+      // 3. Verify password
+      const passwordMatch = await bcrypt.compare(
+        password,
+        employee.password_hash
+      );
 
       if (!passwordMatch) {
         return res.status(401).json({
-          message:
-            "Invalid email or password.",
+          success: false,
+          message: "Invalid email or password.",
         });
       }
 
+      // 4. Update last login
       await pool.query(
         `
-        UPDATE employee_users
-        SET
-          last_login_at =
-            CURRENT_TIMESTAMP
-        WHERE id = $1
+          UPDATE employee_users
+          SET last_login_at = CURRENT_TIMESTAMP
+          WHERE id = $1
         `,
         [employee.id]
       );
 
-      setSessionCookie(
-        res,
-        employee
-      );
+      // 5. Set authentication cookie
+      setSessionCookie(res, employee);
 
-      return res.json({
-        message:
-          "Employee login successful.",
-
-        employee:
-          publicEmployee(
-            employee
-          ),
+      // 6. Successful login
+      return res.status(200).json({
+        success: true,
+        message: "Employee login successful.",
+        employee: publicEmployee(employee),
       });
     } catch (error) {
       return next(error);
     }
   }
 );
+
 
 // =====================================================
 // ME

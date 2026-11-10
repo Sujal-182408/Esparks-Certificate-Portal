@@ -130,11 +130,37 @@ export function getAdminCertificates() {
   return apiRequest("/admin/certificates");
 }
 
-export function revokeAdminCertificate(id) {
+export function revokeAdminCertificate(id, options = {}) {
   return apiRequest(
     `/admin/certificates/${encodeURIComponent(id)}/revoke`,
     {
       method: "PATCH",
+      body: JSON.stringify({
+        deactivateEmployee: options.deactivateEmployee === true,
+      }),
+    }
+  );
+
+}
+
+
+// ===============================================
+// VERIFIED CERTIFICATE DELETION
+// ===============================================
+
+export function requestCertificateDeleteOtp(id) {
+  return apiRequest(
+    `/admin/certificates/${encodeURIComponent(id)}/delete-otp`,
+    { method: "POST" }
+  );
+}
+
+export function confirmCertificateDelete(id, challengeId, otp) {
+  return apiRequest(
+    `/admin/certificates/${encodeURIComponent(id)}/confirm-delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({ challengeId, otp }),
     }
   );
 }

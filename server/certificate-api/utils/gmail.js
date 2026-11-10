@@ -1,102 +1,63 @@
 
-import crypto from "node:crypto";
+import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-async function getGmailAccessToken() {
-  const clientId = process.env.GMAIL_CLIENT_ID;
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  if (!clientId || !clientSecret || !refreshToken) {
+// Load backend environment variables before reading SMTP settings.
+dotenv.config({
+  path: path.resolve(__dirname, "../.env"),
+});
+
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+
+console.log("[SMTP] Configuration:", {
+  host: Boolean(SMTP_HOST),
+  user: Boolean(SMTP_USER),
+  pass: Boolean(SMTP_PASS),
+  port: SMTP_PORT,
+});
+
+let transporter;
+
+function getTransporter() {
+  if (transporter) return transporter;
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     throw new Error(
-      "Gmail API is not configured. Check GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN."
+      "SMTP is not configured. Check SMTP_HOST, SMTP_USER and SMTP_PASS."
     );
   }
 
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token"
+  if (!Number.isInteger(SMTP_PORT) || SMTP_PORT <= 0) {
+    throw new Error("Invalid SMTP_PORT configuration.");
+  }
+
+  transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    requireTLS: SMTP_PORT === 587,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
   });
 
-  const response = await fetch(
-    "https://oauth2.googleapis.com/token",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body
-    }
-  );
-
-  const result = await response.json();
-
-  if (!response.ok || !result.access_token) {
-    throw new Error(
-      `Gmail OAuth token refresh failed: ${
-        result.error_description ||
-        result.error ||
-        response.statusText
-      }`
-    );
-  }
-
-  return result.access_token;
+  return transporter;
 }
 
-function encodeMimeHeader(value) {
-  const text = String(value ?? "").replace(/[\r\n]+/g, " ");
-  return `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`;
-}
-
-function wrapBase64(value) {
-  return String(value).match(/.{1,76}/g)?.join("\r\n") || "";
-}
-
-function buildRawEmail({ from, to, subject, text, html }) {
-  const safeFrom = String(from).replace(/[\r\n<>]/g, "");
-  const safeTo = String(to).replace(/[\r\n<>]/g, "");
-  const boundary = `certificate-${crypto.randomUUID()}`;
-
-  const textBody = wrapBase64(
-    Buffer.from(String(text ?? ""), "utf8").toString("base64")
-  );
-
-  const htmlBody = wrapBase64(
-    Buffer.from(String(html ?? ""), "utf8").toString("base64")
-  );
-
-  const mime = [
-    `From: ${safeFrom}`,
-    `To: ${safeTo}`,
-    `Subject: ${encodeMimeHeader(subject)}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    textBody,
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    htmlBody,
-    `--${boundary}--`,
-    ""
-  ].join("\r\n");
-
-  return Buffer.from(mime, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-
-export async function sendGmailEmail({ to, subject, text, html }) {
+export async function sendEmail({ to, subject, text, html }) {
   const recipient = String(to || "").trim();
 
   if (!recipient) {
@@ -115,49 +76,33 @@ export async function sendGmailEmail({ to, subject, text, html }) {
     throw new Error("Email must contain text or HTML content.");
   }
 
-  const gmailUser = process.env.GMAIL_USER || "nsujalkant@gmail.com";
-  const from = process.env.MAIL_FROM || gmailUser;
-
   try {
-    console.log(`[GMAIL] Sending email to: ${recipient}`);
+    console.log(`[SMTP] Sending email to: ${recipient}`);
 
-    const accessToken = await getGmailAccessToken();
+    const mailer = getTransporter();
 
-    const raw = buildRawEmail({
-      from,
+    const result = await mailer.sendMail({
+      from: SMTP_FROM,
       to: recipient,
       subject: String(subject).trim(),
-      text: text || "",
-      html: html || ""
+      text: text || undefined,
+      html: html || undefined,
     });
 
-    const response = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/send`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ raw })
-      }
+    console.log(
+      `[SMTP] Email accepted. Recipient: ${recipient}, Message ID: ${result.messageId}`
     );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `Gmail API failed (${response.status}): ${errorBody.slice(0, 1000)}`
-      );
-    }
-
-    const result = await response.json();
-
-    console.log(`[GMAIL] Email accepted by Gmail API. Recipient: ${recipient}, Message ID: ${result.id}`);
 
     return result;
   } catch (error) {
-    console.error(`[GMAIL] Failed to send email to ${recipient}:`, error.message);
+    console.error(
+      `[SMTP] Failed to send email to ${recipient}:`,
+      error.message
+    );
+
     throw error;
   }
 }
 
+// Keep existing email calls working.
+export const sendGmailEmail = sendEmail;

@@ -909,9 +909,9 @@ export default function EmployeeDashboard() {
                 Identity verified
               </StatusPill>
 
-              <h1>
+              <h1 className="p-1">
                 Welcome back,
-                <span>
+                <span className="p-3">
                   {employeeName}
                 </span>
               </h1>

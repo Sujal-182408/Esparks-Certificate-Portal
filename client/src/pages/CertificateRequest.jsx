@@ -118,9 +118,7 @@ const [durationMonths, setDurationMonths] = useState("");
       additionalDetails.trim();
 
     if (
-      !["CERT", "INTR"].includes(
-        cleanCertificateType
-      )
+      !["CERT", "EXPR", "INTR"].includes(cleanCertificateType)
     ) {
       setError(
         "Please select a valid certificate type."
@@ -147,16 +145,17 @@ const [durationMonths, setDurationMonths] = useState("");
       return;
     }
 
-    if (cleanCertificateType === "INTR") {
-  const months = Number(durationMonths);
+if (["INTR", "EXPR"].includes(cleanCertificateType)) {
+  const isValidDuration =
+    cleanCertificateType === "INTR"
+      ? /^(0[1-9]|1[0-9]|2[0-4])$/.test(durationMonths)
+      : /^(0[1-9]|[1-9][0-9])$/.test(durationMonths);
 
-  if (
-    !Number.isInteger(months) ||
-    months < 1 ||
-    months > 24
-  ) {
+  if (!isValidDuration) {
     setError(
-      "Internship duration must be between 1 and 24 months."
+      cleanCertificateType === "INTR"
+        ? "Internship duration must be exactly 2 digits, between 01 and 24 months."
+        : "Experience duration must be exactly 2 digits, between 01 and 99 months."
     );
     return;
   }
@@ -179,7 +178,7 @@ const [durationMonths, setDurationMonths] = useState("");
         additional_details:
           cleanAdditionalDetails || null,
         duration_months:
-          cleanCertificateType === "INTR"
+          ["INTR", "EXPR"].includes(cleanCertificateType)
             ? Number(durationMonths)
             : null,
       }),
@@ -209,6 +208,27 @@ const [durationMonths, setDurationMonths] = useState("");
 }
  
   }
+
+  const certificateTypes = [
+  {
+    value: "CERT",
+    label: "General Certificate",
+    description: "Standard course or achievement certificate",
+    icon: BadgeCheck,
+  },
+  {
+    value: "EXPR",
+    label: "Experience Certificate",
+    description: "Proof of employment and work experience",
+    icon: BookOpen,
+  },
+  {
+    value: "INTR",
+    label: "Internship Certificate",
+    description: "Proof of internship or training completion",
+    icon: Sparkles,
+  },
+];
 
   if (loading) {
     return (
@@ -538,81 +558,60 @@ const [durationMonths, setDurationMonths] = useState("");
                 </div>
               </div>
 
-              {/* Type */}
+          {/* Certificate Type */}
+<div className="mt-6">
+  <label className="mb-3 block text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+    Certificate category
+  </label>
 
-              <div className="mt-6">
-                <label className="mb-3 block text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Certificate type
-                </label>
+  <div className="grid gap-3 sm:grid-cols-2">
+    {certificateTypes.map((type) => {
+      const Icon = type.icon;
+      const selected = certificateType === type.value;
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCertificateType("CERT")
-                    }
-                    className={`rounded-2xl border p-4 text-left transition ${
-                      certificateType === "CERT"
-                        ? "border-cyan-300/30 bg-cyan-300/[0.07]"
-                        : "border-white/[0.07] bg-black/20 hover:border-white/[0.13]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-cyan-300/[0.06] text-cyan-300">
-                        <BadgeCheck size={18} />
-                      </div>
+      return (
+        <button
+          key={type.value}
+          type="button"
+          onClick={() => {
+            setCertificateType(type.value);
+            setError("");
+            setSuccess("");
+            if (!["INTR", "EXPR"].includes(type.value)) {
+              setDurationMonths("");
+            }
+          }}
+          className={`rounded-2xl border p-4 text-left transition ${
+            selected
+              ? "border-cyan-300/30 bg-cyan-300/[0.07]"
+              : "border-white/[0.07] bg-black/20 hover:border-white/[0.13]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-cyan-300/[0.06] text-cyan-300">
+              <Icon size={18} />
+            </div>
 
-                      {certificateType === "CERT" && (
-                        <CheckCircle2
-                          size={17}
-                          className="text-cyan-300"
-                        />
-                      )}
-                    </div>
+            {selected && (
+              <CheckCircle2
+                size={17}
+                className="text-cyan-300"
+              />
+            )}
+          </div>
 
-                    <p className="mt-4 text-sm font-black">
-                      Certificate
-                    </p>
+          <p className="mt-4 text-sm font-black">
+            {type.label}
+          </p>
 
-                    <p className="mt-1 text-[10px] text-slate-600">
-                      Standard employee certificate
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCertificateType("INTR")
-                    }
-                    className={`rounded-2xl border p-4 text-left transition ${
-                      certificateType === "INTR"
-                        ? "border-sky-300/30 bg-sky-300/[0.07]"
-                        : "border-white/[0.07] bg-black/20 hover:border-white/[0.13]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-sky-300/[0.06] text-sky-300">
-                        <Sparkles size={18} />
-                      </div>
-
-                      {certificateType === "INTR" && (
-                        <CheckCircle2
-                          size={17}
-                          className="text-sky-300"
-                        />
-                      )}
-                    </div>
-
-                    <p className="mt-4 text-sm font-black">
-                      Internship
-                    </p>
-
-                    <p className="mt-1 text-[10px] text-slate-600">
-                      Internship or training certificate
-                    </p>
-                  </button>
-                </div>
-              </div>
+          <p className="mt-1 text-[10px] text-slate-600">
+            {type.description}
+          </p>
+        </button>
+      );
+    })}
+  </div>
+</div>
 
               {/* Course */}
 
@@ -650,13 +649,15 @@ const [durationMonths, setDurationMonths] = useState("");
 
               {/* Internship Duration */}
 
-{certificateType === "INTR" && (
+{["INTR", "EXPR"].includes(certificateType) && (
   <div className="mt-6">
     <label
       htmlFor="duration_months"
       className="mb-2 block text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500"
     >
-      Internship duration
+      {certificateType === "INTR"
+        ? "Internship duration"
+        : "Experience duration"}
     </label>
 
     <div className="relative">
@@ -667,17 +668,18 @@ const [durationMonths, setDurationMonths] = useState("");
 
       <input
         id="duration_months"
-        type="number"
-        min="1"
-        max="24"
-        step="1"
+        type="text"
+        inputMode="numeric"
+        maxLength={2}
         value={durationMonths}
         onChange={(event) => {
-          setDurationMonths(event.target.value);
+          setDurationMonths(
+            event.target.value.replace(/\D/g, "").slice(0, 2)
+          );
           setError("");
           setSuccess("");
         }}
-        placeholder="e.g. 6"
+        placeholder="e.g. 06"
         className="h-12 w-full rounded-xl border border-white/[0.08] bg-black/25 pl-11 pr-24 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/30 focus:ring-4 focus:ring-cyan-300/[0.05]"
       />
 
@@ -687,7 +689,9 @@ const [durationMonths, setDurationMonths] = useState("");
     </div>
 
     <p className="mt-2 text-[10px] text-slate-700">
-      Enter the internship duration between 1 and 24 months.
+      {certificateType === "INTR"
+        ? "Enter a 2-digit internship duration between 01 and 24 months."
+        : "Enter a 2-digit employment duration between 01 and 99 months."}
     </p>
   </div>
 )}

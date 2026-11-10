@@ -33,6 +33,7 @@ import AddCertificate from "./Admin/Certificates/AddCertificate";
 import ManageCertificate from "./Admin/Certificates/ManageCertificates";
 import AdminViewCertificate from "./Admin/Certificates/ViewCertificate";
 import EditCertificate from "./Admin/Certificates/EditCertificate";
+import ReportsAnalytics from "./Admin/ReportsAnalytics";
 
 // =========================
 // ADMIN CERTIFICATE REQUESTS
@@ -281,6 +282,19 @@ function App() {
           </AdminProtectedRoute>
         }
       />
+
+      {/* =====================================================
+      =     ADMIN REPORTS & ANALYTICS
+      ===================================================== */}
+
+      <Route
+  path="/admin/reports"
+  element={
+    <AdminProtectedRoute>
+      <ReportsAnalytics />
+    </AdminProtectedRoute>
+  }
+/>
 
       {/* =====================================================
           404
