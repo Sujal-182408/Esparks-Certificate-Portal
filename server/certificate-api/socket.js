@@ -1,86 +1,75 @@
 // ============================================================
-// SOCKET.IO CONFIGURATION
+// socket.js — real-time notifications (Socket.IO)
 // ============================================================
-// One Socket.IO instance is attached to the HTTP server from server.js.
-// Notification events are emitted after their PostgreSQL transaction commits.
+//
+// SECURITY FIX
+// ------------
+// The old version let ANY visitor send `join:employee 5` and silently
+// receive employee #5's notifications (certificate numbers, rejection
+// reasons ...). Socket.IO events are just messages from the client: you
+// must never trust an ID the client sends you.
+//
+// Now the user is identified ONCE, during the connection handshake, from
+// the same httpOnly session cookie the REST API uses. The server puts the
+// socket into the right room itself; the client cannot choose a room.
+//
+// Rooms:   "employee:<id>"   "admin:<id>"
+//
+// NOTE: Vercel serverless functions cannot keep WebSocket connections
+// open, so real-time push only works when the API runs as a long-lived
+// Node process (`npm start`). On Vercel, `io` is never initialised and
+// `emitToUser` quietly does nothing — notifications are still saved in
+// the database and appear when the list is loaded.
+// ============================================================
 
 import { Server } from "socket.io";
+import { parseCookieHeader, readSessionUserId, SESSION_TYPES } from "./services/sessionService.js";
 
+/** @type {Server | null} */
 let io = null;
 
-function initializeSocket(server, allowedOrigins = []) {
-  if (io) {
-    throw new Error("Socket.IO has already been initialized.");
-  }
+/** Attach Socket.IO to the HTTP server. Call once from server.js. */
+export function initializeSocket(httpServer, allowedOrigins) {
+  if (io) throw new Error("Socket.IO has already been initialized.");
 
-  io = new Server(server, {
-    cors: {
-      origin: allowedOrigins,
-      credentials: true,
-      methods: ["GET", "POST"],
-    },
-    maxHttpBufferSize: 10000,
+  io = new Server(httpServer, {
+    cors: { origin: allowedOrigins, credentials: true, methods: ["GET", "POST"] },
+    maxHttpBufferSize: 10_000,
+  });
+
+  // Authentication middleware: runs before "connection".
+  io.use((socket, next) => {
+    const cookies = parseCookieHeader(socket.handshake.headers.cookie);
+
+    const adminId = readSessionUserId(cookies[SESSION_TYPES.admin.cookieName], "admin");
+    const employeeId = readSessionUserId(cookies[SESSION_TYPES.employee.cookieName], "employee");
+
+    if (!adminId && !employeeId) {
+      return next(new Error("Authentication required."));
+    }
+
+    socket.data.rooms = [
+      adminId && `admin:${adminId}`,
+      employeeId && `employee:${employeeId}`,
+    ].filter(Boolean);
+
+    return next();
   });
 
   io.on("connection", (socket) => {
-    console.log(`🔌 Socket connected: ${socket.id}`);
-
-    // IMPORTANT: these room-join events only validate the ID format. They do
-    // not authenticate the caller. Add socket JWT/session verification and
-    // compare the requested ID with the verified identity before production use.
-    socket.on("join:employee", (employeeId) => {
-      const id = Number(employeeId);
-      if (!Number.isSafeInteger(id) || id <= 0) {
-        socket.emit("notification:error", { message: "Invalid employee ID." });
-        return;
-      }
-      const room = `employee:${id}`;
-      socket.join(room);
-      console.log(`👤 Employee room requested: ${room}`);
-    });
-
-    socket.on("join:admin", (adminId) => {
-      const id = Number(adminId);
-      if (!Number.isSafeInteger(id) || id <= 0) {
-        socket.emit("notification:error", { message: "Invalid admin ID." });
-        return;
-      }
-      const room = `admin:${id}`;
-      socket.join(room);
-      console.log(`👨‍💼 Admin room requested: ${room}`);
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log(`🔌 Socket disconnected: ${socket.id} - ${reason}`);
-    });
+    socket.join(socket.data.rooms);
   });
 
-  console.log("🔌 Socket.IO initialized successfully.");
+  console.log("[SOCKET] Socket.IO initialized (cookie-authenticated rooms).");
   return io;
 }
 
-function getIO() {
-  if (!io) {
-    throw new Error("Socket.IO has not been initialized.");
-  }
-  return io;
+/**
+ * Emit an event to one user. Safe to call when Socket.IO is not running.
+ * @param {"admin"|"employee"} recipientType
+ * @param {number} recipientId
+ */
+export function emitToUser(recipientType, recipientId, event, payload) {
+  if (!io) return;
+  io.to(`${recipientType}:${Number(recipientId)}`).emit(event, payload);
 }
-
-function emitEmployeeNotification(employeeId, notification) {
-  const id = Number(employeeId);
-  if (!Number.isSafeInteger(id) || id <= 0 || !notification) return;
-  getIO().to(`employee:${id}`).emit("notification:new", notification);
-}
-
-function emitAdminNotification(adminId, notification) {
-  const id = Number(adminId);
-  if (!Number.isSafeInteger(id) || id <= 0 || !notification) return;
-  getIO().to(`admin:${id}`).emit("notification:new", notification);
-}
-
-export {
-  initializeSocket,
-  getIO,
-  emitEmployeeNotification,
-  emitAdminNotification,
-};
