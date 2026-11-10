@@ -46,47 +46,89 @@ const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadReports = async (refresh = false) => {
-    try {
-      refresh ? setRefreshing(true) : setLoading(true);
-      setError("");
-
-      const endpoints = [
-        `${API}/admin/employees`,
-        `${API}/admin/certificates`,
-        `${API}/admin/certificate-requests`
-      ];
-
-      const responses = await Promise.all(
-        endpoints.map((url) =>
-          fetch(url, {
-            credentials: "include",
-            headers: { Accept: "application/json" }
-          })
-        )
-      );
-
-      const results = await Promise.all(
-        responses.map(async (response) => {
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(data?.message || "Unable to load report data.");
-          }
-          return data;
-        })
-      );
-
-      setEmployees(getList(results[0], ["employees", "data"]));
-      setCertificates(getList(results[1], ["certificates", "data"]));
-      setRequests(getList(results[2], ["requests", "data"]));
-    } catch (err) {
-      console.error("Reports analytics error:", err);
-      setError(err.message || "Failed to load analytics.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+ 
+const loadReports = async (refresh = false) => {
+  try {
+    if (refresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
     }
-  };
+
+    setError("");
+
+    const endpoints = [
+      {
+        name: "Employees",
+        url: `${API}/admin/employees`,
+        keys: ["employees", "data"]
+      },
+      {
+        name: "Certificates",
+        url: `${API}/admin/certificates`,
+        keys: ["certificates", "data"]
+      },
+      {
+        name: "Certificate Requests",
+        url: `${API}/admin/certificate-requests`,
+        keys: ["requests", "data"]
+      }
+    ];
+
+    const results = await Promise.all(
+      endpoints.map(async (endpoint) => {
+        const response = await fetch(endpoint.url, {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          }
+        });
+
+        const responseText = await response.text();
+
+        let data = {};
+
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch {
+          throw new Error(
+            `${endpoint.name}: Server returned an invalid response.`
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            `${endpoint.name} API failed (${response.status}): ${
+              data.message || data.error || response.statusText
+            }`
+          );
+        }
+
+        return {
+          name: endpoint.name,
+          data: getList(data, endpoint.keys)
+        };
+      })
+    );
+
+    setEmployees(results[0].data);
+    setCertificates(results[1].data);
+    setRequests(results[2].data);
+
+  } catch (err) {
+    console.error("Reports analytics error:", err);
+
+    setError(
+      err.message || "Unable to load reports. Please try again."
+    );
+
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
 
   useEffect(() => {
     loadReports();
