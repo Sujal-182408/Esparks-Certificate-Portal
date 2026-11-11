@@ -1,6 +1,15 @@
+
 {
   "version": 2,
   "rewrites": [
+    {
+      "source": "/api/socket.io",
+      "destination": "/api"
+    },
+    {
+      "source": "/api/socket.io/:path*",
+      "destination": "/api"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api"
