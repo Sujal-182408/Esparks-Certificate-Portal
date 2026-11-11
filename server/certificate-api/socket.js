@@ -236,7 +236,8 @@ export function initializeSocket(
   // Create Socket.IO server.
   io = new Server(httpServer, {
     // Vercel function endpoint.
-    path: "/api/socket.io",
+   path: "/api/socket.io",
+addTrailingSlash: false,
 
     cors: {
       origin: [...trustedOrigins],
@@ -247,6 +248,18 @@ export function initializeSocket(
     maxHttpBufferSize: 10_000,
   });
 
+  console.log("SOCKET DIAGNOSTICS:", {
+  path: io.path(),
+  requestListeners: httpServer.listeners("request").length,
+  upgradeListeners: httpServer.listeners("upgrade").length,
+});
+io.engine.on("connection_error", (err) => {
+  console.error("SOCKET ENGINE ERROR:", {
+    code: err.code,
+    message: err.message,
+    url: err.req?.url,
+  });
+});
 
   // ==========================================================
   // SOCKET AUTHENTICATION MIDDLEWARE
