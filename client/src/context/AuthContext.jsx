@@ -1,3 +1,4 @@
+
 // ============================================================
 // <AuthProvider> — keeps track of the logged-in EMPLOYEE
 // ============================================================
@@ -17,13 +18,11 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  employeeLogin,
-  employeeLogout,
-  getCurrentEmployee,
-  registerEmployee,
-} from "../services/api";
 import { AuthContext } from "./authContextObject";
+import { apiRequest } from "../services/api";
+import { connectSocket, disconnectSocket } from "../services/socket";
+
+
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -32,12 +31,23 @@ export function AuthProvider({ children }) {
   /** Ask the server who is logged in. Returns the employee or null. */
   const refreshUser = useCallback(async () => {
     try {
-      const data = await getCurrentEmployee({ quiet401: true });
-      setUser(data?.employee || null);
-      return data?.employee || null;
+      const data = await apiRequest("/employee-auth/me");
+      const employee = data?.employee || null;
+      setUser(employee);
+      if (employee) {
+        connectSocket("employee");
+      } else {
+        disconnectSocket("employee");
+      }
+      return employee;
     } catch (error) {
+      if (error.status === 401) {
+        setUser(null);
+        disconnectSocket("employee");
+        return null;
+      }
+      console.error("Employee session refresh failed:", error);
       setUser(null);
-      if (error.status === 401) return null; // simply not logged in
       throw error;
     }
   }, []);
@@ -46,44 +56,45 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false;
 
-    getCurrentEmployee({ quiet401: true })
-      .then((data) => !cancelled && setUser(data?.employee || null))
-      .catch(() => !cancelled && setUser(null))
-      .finally(() => !cancelled && setLoading(false));
+    refreshUser()
+      .catch((error) => console.error("Employee session check failed:", error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     // Cleanup: if the component unmounts before the request finishes,
     // don't update state on an unmounted component.
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshUser]);
 
-  const register = useCallback(
-    async (name, email, password) => {
-      await registerEmployee(name, email, password);
-      return refreshUser();
-    },
-    [refreshUser],
-  );
+  const register = useCallback(async (name, email, password) => {
+    await apiRequest("/employee-auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+    });
+    return refreshUser();
+  }, [refreshUser]);
 
-  const login = useCallback(
-    async (email, password) => {
-      await employeeLogin(email, password);
-      const employee = await refreshUser();
-      if (!employee) {
-        // Usually means the browser blocked the cross-site cookie.
-        throw new Error("Login succeeded, but the session cookie was not accepted by the browser.");
-      }
-      return employee;
-    },
-    [refreshUser],
-  );
+  const login = useCallback(async (email, password) => {
+    await apiRequest("/employee-auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+    const employee = await refreshUser();
+    if (!employee) {
+      throw new Error("Login succeeded, but the employee session cookie was not recognized.");
+    }
+    return employee;
+  }, [refreshUser]);
 
   const logout = useCallback(async () => {
     try {
-      await employeeLogout();
+      await apiRequest("/employee-auth/logout", { method: "POST" });
     } finally {
-      setUser(null); // log out locally even if the request failed
+      disconnectSocket("employee");
+      setUser(null);
     }
   }, []);
 
@@ -97,4 +108,8 @@ export function AuthProvider({ children }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
 }

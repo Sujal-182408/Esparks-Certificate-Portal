@@ -1,5 +1,7 @@
 
 import { useState } from "react";
+
+
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Mail,
@@ -60,9 +62,7 @@ export default function Login() {
         replace: true,
       });
     } catch (err) {
-      setError(
-        err?.message || "Login failed. Please try again."
-      );
+      setError(err?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }

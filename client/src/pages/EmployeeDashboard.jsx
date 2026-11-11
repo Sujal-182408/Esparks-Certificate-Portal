@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 
 import {
   Activity,
   ArrowRight,
-
   BadgeCheck,
   BookOpen,
   CalendarDays,
@@ -26,9 +25,21 @@ import {
   Sparkles,
   User,
   X,
+  Bell,
 } from "lucide-react";
-import brandLogo from "../assets/brand.png";
-import { apiRequest } from "../services/api";
+
+import brandLogo from "/logo.png";
+import banner from "/banner.png";
+
+import {
+  apiRequest,
+  getEmployeeNotifications,
+  markEmployeeNotificationAsRead,
+  markAllEmployeeNotificationsAsRead,
+} from "../services/api";
+
+import { connectSocket, disconnectSocket } from "../services/socket";
+
 import "./EmployeeDashboard.css";
 
 /* =========================================================
@@ -39,10 +50,7 @@ function getEmployeeId(employee) {
   if (!employee) return "";
 
   return String(
-    employee.employee_id ??
-      employee.employeeId ??
-      employee.id ??
-      ""
+    employee.employee_id ?? employee.employeeId ?? employee.id ?? "",
   ).trim();
 }
 
@@ -55,7 +63,7 @@ function getCertificateEmployeeId(data) {
       data.employee?.id ??
       data.employee?.employee_id ??
       data.employee?.employeeId ??
-      ""
+      "",
   ).trim();
 }
 
@@ -63,22 +71,18 @@ function normalizeCertificate(data) {
   if (!data) return null;
 
   const verificationToken =
-    data.verificationToken ??
-    data.verification_token ??
-    "";
+    data.verificationToken ?? data.verification_token ?? "";
 
-  const employeeId =
-    getCertificateEmployeeId(data);
+  const employeeId = getCertificateEmployeeId(data);
 
   const certificateUrl = verificationToken
     ? `${window.location.origin}/certificate/view?token=${encodeURIComponent(
-        verificationToken
+        verificationToken,
       )}`
     : "";
 
   return {
     id: data.id,
-
     employeeId,
 
     certificateNo:
@@ -88,38 +92,20 @@ function normalizeCertificate(data) {
       data.certificate_number ??
       "",
 
-    recipientName:
-      data.recipientName ??
-      data.recipient_name ??
-      "",
+    recipientName: data.recipientName ?? data.recipient_name ?? "",
 
-    courseName:
-      data.courseName ??
-      data.course_name ??
-      "",
+    courseName: data.courseName ?? data.course_name ?? "",
 
-    issuerName:
-      data.issuerName ??
-      data.issuer_name ??
-      "",
+    issuerName: data.issuerName ?? data.issuer_name ?? "",
 
-    issueDate:
-      data.issueDate ??
-      data.issue_date ??
-      "",
+    issueDate: data.issueDate ?? data.issue_date ?? "",
 
-    status: String(
-      data.status ?? ""
-    ).toLowerCase(),
+    status: String(data.status ?? "").toLowerCase(),
 
     verificationToken,
-
     verificationUrl: certificateUrl,
 
-    certificateType:
-      data.certificateType ??
-      data.certificate_type ??
-      "",
+    certificateType: data.certificateType ?? data.certificate_type ?? "",
   };
 }
 
@@ -140,26 +126,16 @@ function formatDate(value) {
 }
 
 function isIssued(certificate) {
-  return (
-    certificate &&
-    String(certificate.status).toLowerCase() ===
-      "issued"
-  );
+  return certificate && String(certificate.status).toLowerCase() === "issued";
 }
 
 /* =========================================================
    STATUS PILL
 ========================================================= */
 
-function StatusPill({
-  children,
-  icon: Icon = CircleCheck,
-  tone = "cyan",
-}) {
+function StatusPill({ children, icon: Icon = CircleCheck, tone = "cyan" }) {
   return (
-    <div
-      className={`ed-status-pill ed-status-${tone}`}
-    >
+    <div className={`ed-status-pill ed-status-${tone}`}>
       <span className="ed-status-dot">
         <span className="ed-status-dot-core" />
       </span>
@@ -175,36 +151,20 @@ function StatusPill({
    CERTIFICATE DETAIL
 ========================================================= */
 
-function CertificateDetail({
-  icon: Icon,
-  label,
-  value,
-  mono = false,
-}) {
+function CertificateDetail({ icon: Icon, label, value, mono = false }) {
   return (
     <div className="ed-detail-card">
       <div className="ed-detail-line" />
 
       <div className="ed-detail-content">
         <div className="ed-detail-icon">
-          <Icon
-            size={16}
-            strokeWidth={1.8}
-          />
+          <Icon size={16} strokeWidth={1.8} />
         </div>
 
         <div className="ed-detail-text">
-          <p className="ed-detail-label">
-            {label}
-          </p>
+          <p className="ed-detail-label">{label}</p>
 
-          <p
-            className={`ed-detail-value ${
-              mono
-                ? "ed-detail-mono"
-                : ""
-            }`}
-          >
+          <p className={`ed-detail-value ${mono ? "ed-detail-mono" : ""}`}>
             {value || "—"}
           </p>
         </div>
@@ -217,35 +177,26 @@ function CertificateDetail({
    EMPTY CERTIFICATES
 ========================================================= */
 
-function EmptyCertificates({
-  onRequest,
-}) {
+function EmptyCertificates({ onRequest }) {
   return (
     <div className="ed-empty-card">
       <div className="ed-empty-glow" />
 
       <div className="ed-empty-icon">
-       <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
+        <img src={brandLogo} alt="eSparks IT Solutions" />
       </div>
 
       <div className="ed-empty-content">
-        <p className="ed-section-eyebrow">
-          Digital credentials
-        </p>
+        <p className="ed-section-eyebrow">Digital credentials</p>
 
         <h2>No certificates yet</h2>
 
         <p>
-          You currently don't have an issued
-          certificate associated with your
+          You currently don't have an issued certificate associated with your
           employee account.
         </p>
 
-        <button
-          type="button"
-          onClick={onRequest}
-          className="ed-primary-button"
-        >
+        <button type="button" onClick={onRequest} className="ed-primary-button">
           Request Certificate
           <ArrowRight size={15} />
         </button>
@@ -258,44 +209,29 @@ function EmptyCertificates({
    PENDING REQUEST
 ========================================================= */
 
-function PendingRequestCard({
-  request,
-}) {
+function PendingRequestCard({ request }) {
   const courseName =
-    request?.courseName ??
-    request?.course_name ??
-    "Certificate request";
+    request?.courseName ?? request?.course_name ?? "Certificate request";
 
   const certificateType =
-    request?.certificateType ??
-    request?.certificate_type ??
-    "CERT";
+    request?.certificateType ?? request?.certificate_type ?? "CERT";
 
-  const createdAt =
-    request?.createdAt ??
-    request?.created_at;
+  const createdAt = request?.createdAt ?? request?.created_at;
 
   return (
     <div className="ed-pending-card">
       <div>
         <div className="ed-pending-heading">
           <p>{courseName}</p>
-
           <span>{certificateType}</span>
         </div>
 
         <p className="ed-pending-date">
-          Submitted{" "}
-          {createdAt
-            ? formatDate(createdAt)
-            : "recently"}
+          Submitted {createdAt ? formatDate(createdAt) : "recently"}
         </p>
       </div>
 
-      <StatusPill
-        icon={Activity}
-        tone="amber"
-      >
+      <StatusPill icon={Activity} tone="amber">
         Pending review
       </StatusPill>
     </div>
@@ -306,24 +242,16 @@ function PendingRequestCard({
    QR MODAL
 ========================================================= */
 
-function QRModal({
-  certificate,
-  onClose,
-  onViewCertificate,
-}) {
+function QRModal({ certificate, onClose, onViewCertificate }) {
   if (!certificate) return null;
 
-  const certificateUrl =
-    certificate.verificationUrl;
+  const certificateUrl = certificate.verificationUrl;
 
   return (
     <div
       className="ed-modal-backdrop"
       onMouseDown={(event) => {
-        if (
-          event.target ===
-          event.currentTarget
-        ) {
+        if (event.target === event.currentTarget) {
           onClose();
         }
       }}
@@ -346,19 +274,11 @@ function QRModal({
               <QrCode size={22} />
             </div>
 
-            <p className="ed-section-eyebrow">
-              Secure certificate access
-            </p>
+            <p className="ed-section-eyebrow">Secure certificate access</p>
 
-            <h2>
-              {certificate.certificateNo ||
-                "Certificate"}
-            </h2>
+            <h2>{certificate.certificateNo || "Certificate"}</h2>
 
-            <p>
-              Scan this QR to open your full
-              certificate.
-            </p>
+            <p>Scan this QR to open your full certificate.</p>
           </div>
 
           <div className="ed-qr-container">
@@ -386,20 +306,15 @@ function QRModal({
           </div>
 
           <div className="ed-qr-info">
-            <p className="ed-detail-label">
-              Certificate
-            </p>
+            <p className="ed-detail-label">Certificate</p>
 
             <p className="ed-qr-course">
-              {certificate.courseName ||
-                "Certificate credential"}
+              {certificate.courseName || "Certificate credential"}
             </p>
 
             <p className="ed-qr-description">
-              Scan this QR to open the full
-              certificate. Access is protected by
-              employee authentication and
-              certificate ownership checks.
+              Scan this QR to open the full certificate. Access is protected by
+              employee authentication and certificate ownership checks.
             </p>
           </div>
 
@@ -407,16 +322,12 @@ function QRModal({
             type="button"
             onClick={() => {
               onClose();
-              onViewCertificate(
-                certificate
-              );
+              onViewCertificate(certificate);
             }}
             className="ed-primary-button ed-full-button"
           >
             <ExternalLink size={16} />
-
             Open Full Certificate
-
             <ArrowRight size={14} />
           </button>
         </div>
@@ -432,178 +343,146 @@ function QRModal({
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
 
-  const [employee, setEmployee] =
-    useState(null);
+  const [employee, setEmployee] = useState(null);
 
-  const [certificates, setCertificates] =
-    useState([]);
+  const [certificates, setCertificates] = useState([]);
 
-  const [pendingRequests, setPendingRequests] =
-    useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
 
-  /*
-   * No full-page loading state.
-   * The dashboard renders immediately.
-   */
-  const [error, setError] =
-    useState("");
+  const [notifications, setNotifications] = useState([]);
 
-  const [
-    selectedCertificate,
-    setSelectedCertificate,
-  ] = useState(null);
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
-  const [copiedId, setCopiedId] =
-    useState(null);
+  const [error, setError] = useState("");
+
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+
+  const [copiedId, setCopiedId] = useState(null);
+
+  /* =======================================================
+     NOTIFICATIONS
+  ====================================================== */
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await getEmployeeNotifications();
+
+      const list = Array.isArray(data?.notifications) ? data.notifications : [];
+
+      setNotifications(list);
+    } catch (error) {
+      console.error("[EMPLOYEE] Notification loading failed:", error);
+    }
+  }, []);
+
+  const handleMarkNotificationRead = async (notification) => {
+    if (!notification?.id || notification.is_read) return;
+
+    try {
+      await markEmployeeNotificationAsRead(notification.id);
+
+      setNotifications((prev) =>
+        prev.map((item) =>
+          String(item.id) === String(notification.id)
+            ? { ...item, is_read: true }
+            : item,
+        ),
+      );
+    } catch (error) {
+      console.error("[EMPLOYEE] Mark notification read failed:", error);
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await markAllEmployeeNotificationsAsRead();
+
+      setNotifications((prev) =>
+        prev.map((item) => ({
+          ...item,
+          is_read: true,
+        })),
+      );
+    } catch (error) {
+      console.error("[EMPLOYEE] Mark all notifications failed:", error);
+    }
+  };
+
+  const unreadNotificationCount = notifications.filter(
+    (item) => !item.is_read,
+  ).length;
 
   /* =======================================================
      LOAD DASHBOARD
   ====================================================== */
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     setError("");
 
     try {
-      /* ---------------------------------------------------
-         EMPLOYEE
-      --------------------------------------------------- */
-
-      const employeeResult =
-        await apiRequest(
-          "/employee-auth/me"
-        );
+      const employeeResult = await apiRequest("/employee-auth/me");
 
       const currentEmployee =
-        employeeResult?.employee ??
-        employeeResult?.user ??
-        employeeResult;
+        employeeResult?.employee ?? employeeResult?.user ?? employeeResult;
 
       if (!currentEmployee) {
-        throw new Error(
-          "Employee account could not be loaded."
-        );
+        throw new Error("Employee account could not be loaded.");
       }
 
       setEmployee(currentEmployee);
 
-      const loggedInEmployeeId =
-        getEmployeeId(
-          currentEmployee
-        );
+      const loggedInEmployeeId = getEmployeeId(currentEmployee);
+
+      // Load saved notifications, including notifications received
+      // while the employee was offline.
+      await loadNotifications();
 
       /* ---------------------------------------------------
          CERTIFICATES
       --------------------------------------------------- */
 
-      const certificateResult =
-        await apiRequest(
-          "/employee/certificates"
-        );
+      const certificateResult = await apiRequest("/employee/certificates");
 
       const rawCertificates =
-        certificateResult?.certificates ??
-        certificateResult?.data ??
-        [];
+        certificateResult?.certificates ?? certificateResult?.data ?? [];
 
-      const normalizedCertificates =
-        Array.isArray(
-          rawCertificates
-        )
-          ? rawCertificates
-              .map(
-                normalizeCertificate
-              )
-              .filter(Boolean)
-          : [];
+      const normalizedCertificates = Array.isArray(rawCertificates)
+        ? rawCertificates.map(normalizeCertificate).filter(Boolean)
+        : [];
 
-      /*
-       * IMPORTANT:
-       *
-       * Never hardcode employee 5.
-       *
-       * If the backend supplies employee_id,
-       * only show certificates belonging to
-       * the currently authenticated employee.
-       *
-       * If employee_id is not returned, the
-       * backend MUST already guarantee that
-       * /employee/certificates contains only
-       * the authenticated employee's records.
-       */
-      const employeeCertificates =
-        loggedInEmployeeId
-          ? normalizedCertificates.filter(
-              (certificate) => {
-                /*
-                 * If certificate has an employee ID,
-                 * enforce the match.
-                 */
-                if (
-                  certificate.employeeId
-                ) {
-                  return (
-                    String(
-                      certificate.employeeId
-                    ) ===
-                    loggedInEmployeeId
-                  );
-                }
+      const employeeCertificates = loggedInEmployeeId
+        ? normalizedCertificates.filter((certificate) => {
+            if (certificate.employeeId) {
+              return String(certificate.employeeId) === loggedInEmployeeId;
+            }
 
-                /*
-                 * If employee_id is not included
-                 * in the response, keep the
-                 * certificate because this endpoint
-                 * is expected to already be scoped
-                 * by the backend.
-                 */
-                return true;
-              }
-            )
-          : [];
+            return true;
+          })
+        : [];
 
-      setCertificates(
-        employeeCertificates
-      );
+      setCertificates(employeeCertificates);
 
       /* ---------------------------------------------------
          REQUESTS
       --------------------------------------------------- */
 
       try {
-        const requestResult =
-          await apiRequest(
-            "/employee/certificate-requests"
-          );
-
-        const requests =
-          requestResult?.requests ??
-          requestResult?.data ??
-          [];
-
-        const pending =
-          Array.isArray(requests)
-            ? requests.filter(
-                (request) =>
-                  String(
-                    request?.status ??
-                      ""
-                  ).toLowerCase() ===
-                  "pending"
-              )
-            : [];
-
-        setPendingRequests(
-          pending
+        const requestResult = await apiRequest(
+          "/employee/certificate-requests",
         );
+
+        const requests = requestResult?.requests ?? requestResult?.data ?? [];
+
+        const pending = Array.isArray(requests)
+          ? requests.filter(
+              (request) =>
+                String(request?.status ?? "").toLowerCase() === "pending",
+            )
+          : [];
+
+        setPendingRequests(pending);
       } catch (requestError) {
-        console.warn(
-          "Certificate requests unavailable:",
-          requestError
-        );
+        console.warn("Certificate requests unavailable:", requestError);
 
         setPendingRequests([]);
       }
@@ -611,11 +490,11 @@ export default function EmployeeDashboard() {
       if (
         err?.status === 401 ||
         err?.status === 403 ||
-        err?.response?.status ===
-          401 ||
-        err?.response?.status ===
-          403
+        err?.response?.status === 401 ||
+        err?.response?.status === 403
       ) {
+        disconnectSocket("employee");
+
         navigate("/login", {
           replace: true,
         });
@@ -623,42 +502,146 @@ export default function EmployeeDashboard() {
         return;
       }
 
-      setError(
-        err?.message ||
-          "Unable to load your employee dashboard."
-      );
+      setError(err?.message || "Unable to load your employee dashboard.");
     }
-  }
+  }, [navigate, loadNotifications]);
+
+  /* =======================================================
+   REFRESH EMPLOYEE CERTIFICATES AND REQUESTS
+======================================================= */
+
+  const refreshEmployeeRecords = useCallback(async () => {
+    const loggedInEmployeeId = getEmployeeId(employee);
+
+    // Refresh certificates.
+    try {
+      const certificateResult = await apiRequest("/employee/certificates");
+
+      const rawCertificates =
+        certificateResult?.certificates ?? certificateResult?.data ?? [];
+
+      const normalizedCertificates = Array.isArray(rawCertificates)
+        ? rawCertificates.map(normalizeCertificate).filter(Boolean)
+        : [];
+
+      const employeeCertificates = loggedInEmployeeId
+        ? normalizedCertificates.filter((certificate) => {
+            if (certificate.employeeId) {
+              return String(certificate.employeeId) === loggedInEmployeeId;
+            }
+
+            return true;
+          })
+        : normalizedCertificates;
+
+      setCertificates(employeeCertificates);
+    } catch (error) {
+      console.error("[EMPLOYEE] Certificate refresh failed:", error);
+    }
+
+    // Refresh certificate requests.
+    try {
+      const requestResult = await apiRequest("/employee/certificate-requests");
+
+      const requests = requestResult?.requests ?? requestResult?.data ?? [];
+
+      const pending = Array.isArray(requests)
+        ? requests.filter(
+            (request) =>
+              String(request?.status ?? "").toLowerCase() === "pending",
+          )
+        : [];
+
+      setPendingRequests(pending);
+    } catch (error) {
+      console.error("[EMPLOYEE] Request refresh failed:", error);
+    }
+  }, [employee]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  /* =======================================================
+     REAL-TIME SOCKET NOTIFICATIONS
+  ====================================================== */
+
+  /* =======================================================
+   REAL-TIME EMPLOYEE NOTIFICATIONS AND DASHBOARD UPDATES
+======================================================= */
+
+  useEffect(() => {
+    if (!employee) return;
+
+    const socket = connectSocket("employee");
+
+    let refreshTimer = null;
+
+    const handleNewNotification = (notification) => {
+      if (!notification?.id) return;
+
+      console.log("[EMPLOYEE] New notification received:", notification);
+
+      // Update notification dropdown immediately.
+      setNotifications((prev) => {
+        const alreadyExists = prev.some(
+          (item) => String(item.id) === String(notification.id),
+        );
+
+        if (alreadyExists) return prev;
+
+        return [notification, ...prev];
+      });
+
+      // Refresh employee dashboard records after the
+      // backend notification has been committed.
+      clearTimeout(refreshTimer);
+
+      refreshTimer = setTimeout(() => {
+        refreshEmployeeRecords();
+      }, 500);
+    };
+
+    const subscribe = () => {
+      socket.off("notification:new", handleNewNotification);
+      socket.on("notification:new", handleNewNotification);
+
+      console.log("[EMPLOYEE] Real-time notification listener attached.");
+    };
+
+    if (socket.connected) {
+      subscribe();
+    } else {
+      socket.on("connect", subscribe);
+    }
+
+    return () => {
+      clearTimeout(refreshTimer);
+
+      socket.off("connect", subscribe);
+      socket.off("notification:new", handleNewNotification);
+    };
+  }, [employee, refreshEmployeeRecords]);
 
   /* =======================================================
      OPEN FULL CERTIFICATE
   ====================================================== */
 
-  function viewCertificate(
-    certificate
-  ) {
+  function viewCertificate(certificate) {
     if (!certificate) {
-      setError(
-        "Certificate information is unavailable."
-      );
-
+      setError("Certificate information is unavailable.");
       return;
     }
 
-    if (
-      !certificate.verificationToken
-    ) {
-      setError(
-        "Certificate verification token is unavailable."
-      );
-
+    if (!certificate.verificationToken) {
+      setError("Certificate verification token is unavailable.");
       return;
     }
 
     navigate(
       `/certificate/view?token=${encodeURIComponent(
-        certificate.verificationToken
-      )}`
+        certificate.verificationToken,
+      )}`,
     );
   }
 
@@ -666,66 +649,38 @@ export default function EmployeeDashboard() {
      COPY CERTIFICATE URL
   ====================================================== */
 
-  async function copyVerificationUrl(
-    certificate
-  ) {
-    if (
-      !certificate?.verificationUrl
-    ) {
-      setError(
-        "Certificate link is unavailable."
-      );
-
+  async function copyVerificationUrl(certificate) {
+    if (!certificate?.verificationUrl) {
+      setError("Certificate link is unavailable.");
       return;
     }
 
     try {
-      if (
-        navigator.clipboard &&
-        window.isSecureContext
-      ) {
-        await navigator.clipboard.writeText(
-          certificate.verificationUrl
-        );
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(certificate.verificationUrl);
       } else {
-        const textarea =
-          document.createElement(
-            "textarea"
-          );
+        const textarea = document.createElement("textarea");
 
-        textarea.value =
-          certificate.verificationUrl;
-
-        textarea.style.position =
-          "fixed";
-
+        textarea.value = certificate.verificationUrl;
+        textarea.style.position = "fixed";
         textarea.style.opacity = "0";
 
-        document.body.appendChild(
-          textarea
-        );
+        document.body.appendChild(textarea);
 
         textarea.focus();
         textarea.select();
 
-        document.execCommand(
-          "copy"
-        );
-
+        document.execCommand("copy");
         textarea.remove();
       }
 
-      setCopiedId(
-        String(certificate.id)
-      );
+      setCopiedId(String(certificate.id));
 
       setTimeout(() => {
         setCopiedId(null);
       }, 2000);
     } catch {
-      setError(
-        "Unable to copy the certificate link."
-      );
+      setError("Unable to copy the certificate link.");
     }
   }
 
@@ -735,18 +690,14 @@ export default function EmployeeDashboard() {
 
   async function logout() {
     try {
-      await apiRequest(
-        "/employee-auth/logout",
-        {
-          method: "POST",
-        }
-      );
+      await apiRequest("/employee-auth/logout", {
+        method: "POST",
+      });
     } catch (err) {
-      console.warn(
-        "Logout request failed:",
-        err
-      );
+      console.warn("Logout request failed:", err);
     } finally {
+      disconnectSocket("employee");
+
       navigate("/login", {
         replace: true,
       });
@@ -757,15 +708,10 @@ export default function EmployeeDashboard() {
      STATS
   ====================================================== */
 
-  const issuedCertificates =
-    useMemo(
-      () =>
-        certificates.filter(
-          (certificate) =>
-            isIssued(certificate)
-        ),
-      [certificates]
-    );
+  const issuedCertificates = useMemo(
+    () => certificates.filter((certificate) => isIssued(certificate)),
+    [certificates],
+  );
 
   /* =======================================================
      EMPLOYEE DATA
@@ -777,16 +723,10 @@ export default function EmployeeDashboard() {
     employee?.employee_name ||
     "Employee";
 
-  const employeeEmail =
-    employee?.email ||
-    employee?.company_email ||
-    "—";
+  const employeeEmail = employee?.email || employee?.company_email || "—";
 
   const employeeId =
-    employee?.employee_id ||
-    employee?.employeeId ||
-    employee?.id ||
-    "—";
+    employee?.employee_id || employee?.employeeId || employee?.id || "—";
 
   /* =======================================================
      UI
@@ -794,800 +734,549 @@ export default function EmployeeDashboard() {
 
   return (
     <main className="employee-dashboard">
+      {/* BACKGROUND */}
 
-      {/* ===================================================
-          BACKGROUND
-      ==================================================== */}
-
-      <div
-        className="ed-background"
-        aria-hidden="true"
-      >
+      <div className="ed-background" aria-hidden="true">
         <div className="ed-bg-glow ed-bg-glow-one" />
-
         <div className="ed-bg-glow ed-bg-glow-two" />
-
         <div className="ed-grid-background" />
-
         <div className="ed-top-line" />
       </div>
 
-      {/* ===================================================
-          NAVBAR
-      ==================================================== */}
+      {/* NAVBAR */}
 
       <header className="ed-navbar">
         <div className="ed-navbar-inner">
-
-          <div className="ed-brand">
-
-            <div className="ed-brand-icon">
-              <div className="ed-brand-inner">
-                <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
-              </div>
-            </div>
-
-            <div>
-              <p className="ed-brand-name">
-                ESPARKS{" "}
-                <span>
-                  IT SOLUTIONS
-                </span>
-              </p>
-
-              {/* <p className="ed-brand-subtitle">
-                Digital Credential Network
-              </p> */}
-            </div>
-
-          </div>
+          <img
+            src={banner}
+            alt="Esparks IT Solutions"
+            width="200"
+            height="70"
+          />
 
           <div className="ed-navbar-actions">
+            {/* NOTIFICATIONS */}
+            <div className="ed-notification-wrapper">
+              <button
+                type="button"
+                className="ed-notification-button"
+                onClick={() => setNotificationOpen((prev) => !prev)}
+                aria-label={
+                  notificationOpen
+                    ? "Close notifications"
+                    : "Open notifications"
+                }
+                aria-expanded={notificationOpen}
+              >
+                {notificationOpen ? <X size={19} /> : <Bell size={19} />}
+
+                {!notificationOpen && unreadNotificationCount > 0 && (
+                  <span className="ed-notification-badge">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationOpen && (
+                <div className="ed-notification-dropdown">
+                  <div className="ed-notification-header">
+                    <div>
+                      <strong>Notifications</strong>
+                      <span>{unreadNotificationCount} unread</span>
+                    </div>
+
+                    {unreadNotificationCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllNotificationsRead}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="ed-notification-list">
+                    {notifications.length === 0 ? (
+                      <div className="ed-no-notifications">
+                        <Bell size={22} />
+                        <p>No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.slice(0, 15).map((notification) => (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          className={`ed-notification-item ${
+                            notification.is_read ? "" : "unread"
+                          }`}
+                          onClick={() =>
+                            handleMarkNotificationRead(notification)
+                          }
+                        >
+                          <div className="ed-notification-item-icon">
+                            <Bell size={16} />
+                          </div>
+
+                          <div className="ed-notification-item-content">
+                            <strong>{notification.title}</strong>
+                            <p>{notification.message}</p>
+                            <small>
+                              {notification.created_at
+                                ? new Date(
+                                    notification.created_at,
+                                  ).toLocaleString("en-IN")
+                                : ""}
+                            </small>
+                          </div>
+
+                          {!notification.is_read && (
+                            <span className="ed-notification-unread-dot" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="ed-session">
               <span className="ed-session-dot" />
-
-              <span>
-                Secure session
-              </span>
+              <span>Secure session</span>
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/verify")
-              }
+              onClick={() => navigate("/verify")}
               className="ed-scan-button"
               title="Scan a certificate QR code"
             >
               <ScanLine size={15} />
-
-              <span>
-                Scan Certificate
-              </span>
+              <span>Scan Certificate</span>
             </button>
 
-            <button
-              type="button"
-              onClick={logout}
-              className="ed-logout-button"
-            >
+            <button type="button" onClick={logout} className="ed-logout-button">
               <LogOut size={15} />
-
-              <span>
-                Sign out
-              </span>
+              <span>Sign out</span>
             </button>
-
           </div>
-
         </div>
       </header>
 
-      {/* ===================================================
-          CONTENT
-      ==================================================== */}
+      {/* CONTENT */}
 
       <div className="ed-content">
-
-        {/* =================================================
-            HERO
-        ================================================== */}
+        {/* HERO */}
 
         <section className="ed-hero">
-
           <div className="ed-hero-glow" />
-
           <div className="ed-hero-bottom-line" />
 
           <div className="ed-hero-content">
-
             <div className="ed-hero-main">
-
-              <StatusPill
-                icon={ShieldCheck}
-              >
-                Identity verified
-              </StatusPill>
+              <StatusPill icon={ShieldCheck}>Identity verified</StatusPill>
 
               <h1 className="p-1">
                 Welcome back,
-                <span className="p-3">
-                  {employeeName}
-                </span>
+                <span className="p-3">{employeeName}</span>
               </h1>
 
               <p className="ed-hero-description">
-                Manage your digital credentials
-                from one protected workspace.
-                Every certificate has its own
-                verification identity and QR.
+                Manage your digital credentials from one protected workspace.
+                Every certificate has its own verification identity and QR.
               </p>
 
               <div className="ed-employee-meta">
-
                 <div className="ed-meta-item">
                   <Mail size={13} />
-
-                  <span>
-                    {employeeEmail}
-                  </span>
+                  <span>{employeeEmail}</span>
                 </div>
 
                 <div className="ed-meta-item">
                   <Fingerprint size={13} />
-
-                  <span>
-                    ID: {employeeId}
-                  </span>
+                  <span>ID: {employeeId}</span>
                 </div>
-
               </div>
-
             </div>
 
             <div className="ed-workspace-status">
-
               <div className="ed-workspace-icon">
                 <LockKeyhole size={18} />
               </div>
 
               <div>
-                <p>
-                  Workspace
-                </p>
-
-                <strong>
-                  Protected & active
-                </strong>
+                <p>Workspace</p>
+                <strong>Protected & active</strong>
               </div>
 
-              <Radio
-                size={13}
-                className="ed-live-icon"
-              />
-
+              <Radio size={13} className="ed-live-icon" />
             </div>
-
           </div>
-
         </section>
 
-        {/* =================================================
-            ERROR
-        ================================================== */}
+        {/* ERROR */}
 
         {error && (
           <div className="ed-error">
-
             <div className="ed-error-icon">
               <Shield size={15} />
             </div>
 
             <div>
-              <strong>
-                Something needs attention
-              </strong>
-
-              <p>
-                {error}
-              </p>
+              <strong>Something needs attention</strong>
+              <p>{error}</p>
             </div>
-
           </div>
         )}
 
-        {/* =================================================
-            STATS
-        ================================================== */}
+        {/* STATS */}
 
         <section className="ed-stats">
-
           <div className="ed-stat-card">
-
             <div className="ed-stat-top">
-
               <div className="ed-stat-icon cyan">
                 <User size={18} />
               </div>
 
-              <CircleCheck
-                size={16}
-                className="ed-success"
-              />
-
+              <CircleCheck size={16} className="ed-success" />
             </div>
 
-            <p className="ed-stat-label">
-              Employee account
-            </p>
-
-            <strong>
-              Active
-            </strong>
-
-            <span>
-              Identity successfully verified
-            </span>
-
+            <p className="ed-stat-label">Employee account</p>
+            <strong>Active</strong>
+            <span>Identity successfully verified</span>
           </div>
 
           <div className="ed-stat-card">
-
             <div className="ed-stat-top">
-
               <div className="ed-stat-icon sky">
                 <FileCheck2 size={18} />
               </div>
 
-              <span className="ed-stat-count">
-                {
-                  issuedCertificates.length
-                }
-              </span>
-
+              <span className="ed-stat-count">{issuedCertificates.length}</span>
             </div>
 
-            <p className="ed-stat-label">
-              Certificates
-            </p>
+            <p className="ed-stat-label">Certificates</p>
 
             <strong>
-              {issuedCertificates.length
-                ? "Available"
-                : "None yet"}
+              {issuedCertificates.length ? "Available" : "None yet"}
             </strong>
 
-            <span>
-              Issued credentials
-            </span>
-
+            <span>Issued credentials</span>
           </div>
 
           <div className="ed-stat-card">
-
             <div className="ed-stat-top">
-
               <div className="ed-stat-icon cyan">
                 <ShieldCheck size={18} />
               </div>
 
-              <Sparkles
-                size={15}
-                className="ed-cyan"
-              />
-
+              <Sparkles size={15} className="ed-cyan" />
             </div>
 
-            <p className="ed-stat-label">
-              Certificates accessible
-            </p>
+            <p className="ed-stat-label">Certificates accessible</p>
 
-            <strong>
-              {
-                issuedCertificates.length
-              }
-            </strong>
+            <strong>{issuedCertificates.length}</strong>
 
-            <span>
-              Available to your account
-            </span>
-
+            <span>Available to your account</span>
           </div>
 
           <div className="ed-stat-card">
-
             <div className="ed-stat-top">
-
               <div className="ed-stat-icon blue">
                 <Activity size={18} />
               </div>
 
               <span className="ed-active-dot" />
-
             </div>
 
-            <p className="ed-stat-label">
-              Security status
-            </p>
-
-            <strong>
-              Protected
-            </strong>
-
-            <span>
-              Ownership controls enabled
-            </span>
-
+            <p className="ed-stat-label">Security status</p>
+            <strong>Protected</strong>
+            <span>Ownership controls enabled</span>
           </div>
-
         </section>
 
-        {/* =================================================
-            PENDING REQUESTS
-        ================================================== */}
+        {/* PENDING REQUESTS */}
 
-        {pendingRequests.length >
-          0 && (
+        {pendingRequests.length > 0 && (
           <section className="ed-section">
-
             <div className="ed-section-heading">
-
               <div>
+                <p className="ed-section-eyebrow amber">Requests</p>
 
-                <p className="ed-section-eyebrow amber">
-                  Requests
-                </p>
-
-                <h2>
-                  Pending certificates
-                </h2>
-
+                <h2>Pending certificates</h2>
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    "/certificate/request"
-                  )
-                }
+                onClick={() => navigate("/certificate/request")}
                 className="ed-text-button"
               >
                 New request
               </button>
-
             </div>
 
             <div className="ed-pending-list">
-
-              {pendingRequests.map(
-                (request) => (
-                  <PendingRequestCard
-                    key={request.id}
-                    request={request}
-                  />
-                )
-              )}
-
+              {pendingRequests.map((request) => (
+                <PendingRequestCard key={request.id} request={request} />
+              ))}
             </div>
-
           </section>
         )}
 
-        {/* =================================================
-            CERTIFICATES
-        ================================================== */}
+        {/* CERTIFICATES */}
 
         <section className="ed-section ed-certificates-section">
-
           <div className="ed-section-heading certificate-heading">
-
             <div>
-
               <div className="ed-heading-label">
-
                 <span />
-
-                <p className="ed-section-eyebrow">
-                  Digital credentials
-                </p>
-
+                <p className="ed-section-eyebrow">Digital credentials</p>
               </div>
 
-              <h2>
-                My Certificates
-              </h2>
+              <h2>My Certificates</h2>
 
               <p className="ed-section-description">
-                Open your certificate directly or
-                generate a secure QR that opens the
-                full certificate.
+                Open your certificate directly or generate a secure QR that
+                opens the full certificate.
               </p>
-
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                navigate(
-                  "/certificate/request"
-                )
-              }
+              onClick={() => navigate("/certificate/request")}
               className="ed-secondary-button"
             >
               Request certificate
               <ArrowRight size={14} />
             </button>
-
           </div>
 
-          {issuedCertificates.length ===
-          0 ? (
+          {issuedCertificates.length === 0 ? (
             <EmptyCertificates
-              onRequest={() =>
-                navigate(
-                  "/certificate/request"
-                )
-              }
+              onRequest={() => navigate("/certificate/request")}
             />
           ) : (
             <div className="ed-certificate-grid">
+              {issuedCertificates.map((certificate) => {
+                const copied = copiedId === String(certificate.id);
 
-              {issuedCertificates.map(
-                (certificate) => {
-                  const copied =
-                    copiedId ===
-                    String(
-                      certificate.id
-                    );
+                return (
+                  <article key={certificate.id} className="ed-certificate-card">
+                    <div className="ed-card-top-line" />
+                    <div className="ed-card-glow" />
 
-                  return (
-                    <article
-                      key={
-                        certificate.id
-                      }
-                      className="ed-certificate-card"
-                    >
+                    <div className="ed-certificate-content">
+                      {/* HEADER */}
 
-                      <div className="ed-card-top-line" />
-
-                      <div className="ed-card-glow" />
-
-                      <div className="ed-certificate-content">
-
-                        {/* HEADER */}
-
-                        <div className="ed-certificate-header">
-
-                          <div className="ed-certificate-title">
-
-                            <div className="ed-certificate-icon">
-                              <BadgeCheck size={22} />
-                            </div>
-
-                            <div>
-
-                              <p>
-                                Certificate
-                              </p>
-
-                              <strong>
-                                {certificate.certificateNo ||
-                                  "Certificate"}
-                              </strong>
-
-                            </div>
-
+                      <div className="ed-certificate-header">
+                        <div className="ed-certificate-title">
+                          <div className="ed-certificate-icon">
+                            <BadgeCheck size={22} />
                           </div>
 
-                          <StatusPill
-                            tone="green"
-                            icon={
-                              CircleCheck
-                            }
-                          >
-                            Issued
-                          </StatusPill>
+                          <div>
+                            <p>Certificate</p>
 
-                        </div>
-
-                        {/* COURSE */}
-
-                        <div className="ed-course-box">
-
-                          <p>
-                            Course / Program
-                          </p>
-
-                          <h3>
-                            {certificate.courseName ||
-                              "Certificate credential"}
-                          </h3>
-
-                          <div className="ed-course-line" />
-
-                          <div className="ed-details-grid">
-
-                            <CertificateDetail
-                              icon={User}
-                              label="Recipient"
-                              value={
-                                certificate.recipientName ||
-                                employeeName
-                              }
-                            />
-
-                            <CertificateDetail
-                              icon={
-                                CalendarDays
-                              }
-                              label="Issued"
-                              value={formatDate(
-                                certificate.issueDate
-                              )}
-                            />
-
-                            <CertificateDetail
-                              icon={
-                                BookOpen
-                              }
-                              label="Program"
-                              value={
-                                certificate.courseName
-                              }
-                            />
-
-                            <CertificateDetail
-                              icon={
-                                ShieldCheck
-                              }
-                              label="Issuer"
-                              value={
-                                certificate.issuerName
-                              }
-                            />
-
+                            <strong>
+                              {certificate.certificateNo || "Certificate"}
+                            </strong>
                           </div>
-
                         </div>
 
-                        {/* ACCESS STATE */}
-
-                        <div className="ed-verification-state">
-
-                          <div className="ed-verified-box">
-
-                            <div>
-                              <CircleCheck size={17} />
-                            </div>
-
-                            <section>
-
-                              <strong>
-                                Certificate available
-                              </strong>
-
-                              <span>
-                                Open the full certificate
-                                securely using your
-                                employee account.
-                              </span>
-
-                            </section>
-
-                          </div>
-
-                        </div>
-
-                        {/* ACTIONS */}
-
-                        <div className="ed-actions">
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              viewCertificate(
-                                certificate
-                              )
-                            }
-                            className="ed-view-button"
-                          >
-                            <ExternalLink size={15} />
-
-                            View Certificate
-
-                            <ArrowRight size={13} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedCertificate(
-                                certificate
-                              )
-                            }
-                            className="ed-qr-button"
-                          >
-                            <QrCode size={15} />
-
-                            Generate QR
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              copyVerificationUrl(
-                                certificate
-                              )
-                            }
-                            className="ed-copy-button"
-                            title="Copy secure certificate link"
-                          >
-                            {copied ? (
-                              <Check
-                                size={15}
-                                className="ed-success"
-                              />
-                            ) : (
-                              <Copy size={15} />
-                            )}
-
-                            <span>
-                              {copied
-                                ? "Copied"
-                                : "Copy"}
-                            </span>
-                          </button>
-
-                        </div>
-
-                        {/* FOOTER */}
-
-                        <div className="ed-card-footer">
-
-                          <span>
-                            <Fingerprint size={12} />
-
-                            Employee protected
-                          </span>
-
-                          <span>
-                            <LockKeyhole size={12} />
-
-                            Full certificate access
-                          </span>
-
-                        </div>
-
+                        <StatusPill tone="green" icon={CircleCheck}>
+                          Issued
+                        </StatusPill>
                       </div>
 
-                    </article>
-                  );
-                }
-              )}
+                      {/* COURSE */}
 
+                      <div className="ed-course-box">
+                        <p>Course / Program</p>
+
+                        <h3>
+                          {certificate.courseName || "Certificate credential"}
+                        </h3>
+
+                        <div className="ed-course-line" />
+
+                        <div className="ed-details-grid">
+                          <CertificateDetail
+                            icon={User}
+                            label="Recipient"
+                            value={certificate.recipientName || employeeName}
+                          />
+
+                          <CertificateDetail
+                            icon={CalendarDays}
+                            label="Issued"
+                            value={formatDate(certificate.issueDate)}
+                          />
+
+                          <CertificateDetail
+                            icon={BookOpen}
+                            label="Program"
+                            value={certificate.courseName}
+                          />
+
+                          <CertificateDetail
+                            icon={ShieldCheck}
+                            label="Issuer"
+                            value={certificate.issuerName}
+                          />
+                        </div>
+                      </div>
+
+                      {/* ACCESS STATE */}
+
+                      <div className="ed-verification-state">
+                        <div className="ed-verified-box">
+                          <div>
+                            <CircleCheck size={17} />
+                          </div>
+
+                          <section>
+                            <strong>Certificate available</strong>
+
+                            <span>
+                              Open the full certificate securely using your
+                              employee account.
+                            </span>
+                          </section>
+                        </div>
+                      </div>
+
+                      {/* ACTIONS */}
+
+                      <div className="ed-actions">
+                        <button
+                          type="button"
+                          onClick={() => viewCertificate(certificate)}
+                          className="ed-view-button"
+                        >
+                          <ExternalLink size={15} />
+                          View Certificate
+                          <ArrowRight size={13} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCertificate(certificate)}
+                          className="ed-qr-button"
+                        >
+                          <QrCode size={15} />
+                          Generate QR
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => copyVerificationUrl(certificate)}
+                          className="ed-copy-button"
+                          title="Copy secure certificate link"
+                        >
+                          {copied ? (
+                            <Check size={15} className="ed-success" />
+                          ) : (
+                            <Copy size={15} />
+                          )}
+
+                          <span>{copied ? "Copied" : "Copy"}</span>
+                        </button>
+                      </div>
+
+                      {/* FOOTER */}
+
+                      <div className="ed-card-footer">
+                        <span>
+                          <Fingerprint size={12} />
+                          Employee protected
+                        </span>
+
+                        <span>
+                          <LockKeyhole size={12} />
+                          Full certificate access
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
-
         </section>
 
-        {/* =================================================
-            SECURITY
-        ================================================== */}
+        {/* SECURITY */}
 
         <section className="ed-security-grid">
-
           <div className="ed-security-card">
-
             <div className="ed-security-icon cyan">
               <ShieldCheck size={17} />
             </div>
 
-            <h3>
-              Employee protected
-            </h3>
+            <h3>Employee protected</h3>
 
             <p>
-              Your certificate is loaded through
-              an authenticated employee session.
+              Your certificate is loaded through an authenticated employee
+              session.
             </p>
-
           </div>
 
           <div className="ed-security-card">
-
             <div className="ed-security-icon sky">
               <QrCode size={17} />
             </div>
 
-            <h3>
-              One QR per certificate
-            </h3>
+            <h3>One QR per certificate</h3>
 
             <p>
-              Each certificate has its own unique
-              verification token and QR credential.
+              Each certificate has its own unique verification token and QR
+              credential.
             </p>
-
           </div>
 
           <div className="ed-security-card">
-
             <div className="ed-security-icon blue">
               <LockKeyhole size={17} />
             </div>
 
-            <h3>
-              Ownership protected
-            </h3>
+            <h3>Ownership protected</h3>
 
             <p>
-              The server checks the certificate token
-              against the authenticated employee before
-              returning the full certificate.
+              The server checks the certificate token against the authenticated
+              employee before returning the full certificate.
             </p>
-
           </div>
-
         </section>
 
-        {/* =================================================
-            FOOTER
-        ================================================== */}
+        {/* FOOTER */}
 
         <footer className="ed-footer">
-
           <div className="ed-footer-left">
-
             <div className="ed-footer-icon">
-            <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
+              <img src={brandLogo} alt="Esparks IT Solution" />
             </div>
 
-            <span>
-              Esparks IT Solutions Secure Credential Network
-            </span>
-
+            <span>ESPARKS IT SOLUTIONS Secure Credential Network</span>
           </div>
 
           <div className="ed-footer-right">
-
-            <span>
-              Protected workspace
-            </span>
-
+            <span>Protected workspace</span>
             <i />
-
-            <span>
-              Full certificate access enabled
-            </span>
-
+            <span>Full certificate access enabled</span>
           </div>
-
         </footer>
-
       </div>
 
-      {/* =================================================
-          QR MODAL
-      ================================================== */}
+      {/* QR MODAL */}
 
       {selectedCertificate && (
         <QRModal
-          certificate={
-            selectedCertificate
-          }
-          onClose={() =>
-            setSelectedCertificate(
-              null
-            )
-          }
-          onViewCertificate={
-            viewCertificate
-          }
+          certificate={selectedCertificate}
+          onClose={() => setSelectedCertificate(null)}
+          onViewCertificate={viewCertificate}
         />
       )}
-
     </main>
   );
 }
