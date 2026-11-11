@@ -252,7 +252,7 @@ export default function AdminDashboard() {
       <main className="admin-loading">
         <div className="admin-loader">
           <div className="admin-loader-ring" />
-          <img src={brandLogo} alt="eSparks IT Solutions" />
+          <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
         </div>
 
         <p>Loading administration panel...</p>
@@ -280,7 +280,7 @@ export default function AdminDashboard() {
         <div className="admin-header-inner">
           <Link to="/admin" className="admin-brand">
             <div className="admin-brand-logo">
-              <img src={brandLogo} alt="eSparks IT Solutions" />
+              <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
             </div>
 
             <div>
@@ -526,7 +526,7 @@ export default function AdminDashboard() {
             <div className="hero-ring hero-ring-two" />
 
             <div className="hero-shield">
-              <img src={brandLogo} alt="eSparks IT Solutions" />
+              <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
             </div>
 
             <div className="hero-floating-card hero-card-one">
@@ -701,7 +701,7 @@ export default function AdminDashboard() {
 
               <h4>Employees</h4>
 
-              <p>Manage registered eSparks IT employee accounts.</p>
+              <p>Manage registered Esparks IT Solutions Private Limited employee accounts.</p>
 
               <span className="workspace-link">
                 Manage Employees
@@ -760,7 +760,7 @@ export default function AdminDashboard() {
 
         <footer className="admin-footer">
           <div>
-            <img src={brandLogo} alt="eSparks IT Solutions" />
+            <img src={brandLogo} alt="Esparks IT Solutions Private Limited" />
             Esparks Certificate Management System
           </div>
 

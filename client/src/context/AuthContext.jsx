@@ -1,130 +1,100 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { apiRequest } from "../services/api";
+// ============================================================
+// <AuthProvider> — keeps track of the logged-in EMPLOYEE
+// ============================================================
+//
+// HOW IT WORKS
+// ------------
+// The real session is an httpOnly cookie that JavaScript cannot read.
+// So on page load we simply ask the server "who am I?"
+// (GET /api/employee-auth/me):
+//   - 200 -> store the employee in `user`
+//   - 401 -> not logged in, `user` = null
+//
+// While that first check runs, `loading` is true so <ProtectedRoute>
+// shows a spinner instead of wrongly redirecting to /login.
+//
+// Admin sessions are separate and are checked by <AdminProtectedRoute>.
+// ============================================================
 
-const AuthContext = createContext(null);
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  employeeLogin,
+  employeeLogout,
+  getCurrentEmployee,
+  registerEmployee,
+} from "../services/api";
+import { AuthContext } from "./authContextObject";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  /** Ask the server who is logged in. Returns the employee or null. */
   const refreshUser = useCallback(async () => {
     try {
-      const data = await apiRequest("/employee-auth/me");
-      const employee = data?.employee || null;
-      setUser(employee);
-      return employee;
+      const data = await getCurrentEmployee({ quiet401: true });
+      setUser(data?.employee || null);
+      return data?.employee || null;
     } catch (error) {
-      if (error.status === 401) {
-        setUser(null);
-        return null;
-      }
-      console.error("Employee session refresh failed:", error);
+      setUser(null);
+      if (error.status === 401) return null; // simply not logged in
       throw error;
     }
   }, []);
 
+  // Check the session once when the app starts.
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
 
-    async function checkEmployeeSession() {
-      try {
-        const data = await apiRequest("/employee-auth/me", { quiet401: true });
-        if (mounted) setUser(data?.employee || null);
-      } catch (error) {
-        if (error.status !== 401) {
-          console.error("Employee session check failed:", error);
-        }
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
+    getCurrentEmployee({ quiet401: true })
+      .then((data) => !cancelled && setUser(data?.employee || null))
+      .catch(() => !cancelled && setUser(null))
+      .finally(() => !cancelled && setLoading(false));
 
-    checkEmployeeSession();
+    // Cleanup: if the component unmounts before the request finishes,
+    // don't update state on an unmounted component.
     return () => {
-      mounted = false;
+      cancelled = true;
     };
   }, []);
 
-  async function register(name, email, password) {
-    setLoading(true);
-    try {
-      await apiRequest("/employee-auth/register", {
-        method: "POST",
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-        }),
-      });
-      return await refreshUser();
-    } finally {
-      setLoading(false);
-    }
-  }
+  const register = useCallback(
+    async (name, email, password) => {
+      await registerEmployee(name, email, password);
+      return refreshUser();
+    },
+    [refreshUser],
+  );
 
-  async function login(email, password) {
-    setLoading(true);
-    try {
-      await apiRequest("/employee-auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-        }),
-      });
-
+  const login = useCallback(
+    async (email, password) => {
+      await employeeLogin(email, password);
       const employee = await refreshUser();
-
       if (!employee) {
-        throw new Error(
-          "Login succeeded, but the employee session cookie was not recognized.",
-        );
+        // Usually means the browser blocked the cross-site cookie.
+        throw new Error("Login succeeded, but the session cookie was not accepted by the browser.");
       }
-
       return employee;
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [refreshUser],
+  );
 
-  async function logout() {
-    setLoading(true);
+  const logout = useCallback(async () => {
     try {
-      await apiRequest("/employee-auth/logout", {
-        method: "POST",
-      });
+      await employeeLogout();
     } finally {
-      setUser(null);
-      setLoading(false);
+      setUser(null); // log out locally even if the request failed
     }
-  }
+  }, []);
 
-  const value = {
-    user,
-    loading,
-    register,
-    login,
-    logout,
-    refreshUser,
-    isAuthenticated: Boolean(user),
-  };
+  // useMemo: only create a new value object when something changed, so
+  // components using useAuth() don't re-render on every parent render.
+  // NOTE: `loading` here only means "initial session check". Pages keep
+  // their own `submitting` state for button spinners.
+  const value = useMemo(
+    () => ({ user, loading, register, login, logout, refreshUser, isAuthenticated: Boolean(user) }),
+    [user, loading, register, login, logout, refreshUser],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside an AuthProvider.");
-  }
-
-  return context;
 }

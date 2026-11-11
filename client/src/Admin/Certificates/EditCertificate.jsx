@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Save, FilePenLine } from "lucide-react";
 import BackButton from "../../components/BackButton";
+import { getAdminCertificate, updateCertificate } from "../../services/api";
 import "./EditCertificate.css";
-
-const API_URL = `${(import.meta.env.VITE_API_URL || "").replace(/\/+$/, "")}/api`;
 
 export default function EditCertificate() {
   const { id } = useParams();
@@ -39,27 +38,8 @@ export default function EditCertificate() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          `${API_URL}/admin/certificates/${id}`,
-          {
-            method: "GET",
-            credentials: "include",
-            headers: {
-              Accept: "application/json",
-            },
-          }
-        );
-
-        const data = await response
-          .json()
-          .catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "Failed to load certificate."
-          );
-        }
+        // Shared API helper: correct base URL + session cookie + error handling.
+        const data = await getAdminCertificate(id);
 
         const certificate =
           data?.certificate || data;
@@ -230,38 +210,7 @@ export default function EditCertificate() {
           Number(form.employeeId),
       };
 
-      console.log(
-        "Updating certificate:",
-        payload
-      );
-
-      const response = await fetch(
-        `${API_URL}/admin/certificates/${id}`,
-        {
-          method: "PUT",
-
-          credentials: "include",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-            Accept: "application/json",
-          },
-
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response
-        .json()
-        .catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            "Failed to update certificate."
-        );
-      }
+      const data = await updateCertificate(id, payload);
 
       setSuccess(
         data?.message ||

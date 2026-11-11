@@ -16,12 +16,8 @@ export default function AdminProtectedRoute({
 
     async function checkAuth() {
       try {
-        const data = await getCurrentAdmin();
-
-        console.log(
-          "🔐 AdminProtectedRoute /me:",
-          data
-        );
+        // quiet401: being logged out is an expected answer here, not an error.
+        const data = await getCurrentAdmin({ quiet401: true });
 
         if (!mounted) {
           return;
@@ -31,24 +27,13 @@ export default function AdminProtectedRoute({
           data?.admin?.role === "admin" &&
           data?.admin?.is_active === true
         ) {
-          console.log(
-            "✅ Admin session verified:",
-            data.admin.email
-          );
 
           setAuthenticated(true);
         } else {
-          console.log(
-            "❌ Admin session invalid."
-          );
 
           setAuthenticated(false);
         }
-      } catch (error) {
-        console.error(
-          "❌ AdminProtectedRoute error:",
-          error
-        );
+      } catch {
 
         if (mounted) {
           setAuthenticated(false);

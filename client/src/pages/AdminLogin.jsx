@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
   LockKeyhole,
@@ -12,9 +12,16 @@ import {
   adminLogin,
   getCurrentAdmin,
 } from "../services/api";
+import { getPostLoginPath } from "../utils/redirect";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Links in "new certificate request" emails look like
+  // /admin/login?requestId=42 — after login, open that request directly.
+  const [searchParams] = useSearchParams();
+  const emailRequestId = searchParams.get("requestId");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,23 +40,16 @@ export default function AdminLogin() {
       // ADMIN LOGIN
       // ==========================================
 
-      const data = await adminLogin(
+      await adminLogin(
         email.trim(),
         password
       );
-
-      console.log("ADMIN LOGIN RESPONSE:", data);
 
       // ==========================================
       // VERIFY ADMIN SESSION
       // ==========================================
 
       const meData = await getCurrentAdmin();
-
-      console.log(
-        "ADMIN SESSION RESPONSE:",
-        meData
-      );
 
       // ==========================================
       // VERIFY ADMIN ROLE
@@ -71,23 +71,18 @@ export default function AdminLogin() {
         );
       }
 
-      console.log("ADMIN LOGIN SUCCESS");
-      console.log("ADMIN:", meData.admin);
 
       // ==========================================
       // REDIRECT TO ADMIN DASHBOARD
       // ==========================================
 
-      navigate("/admin", {
-        replace: true,
-      });
+      const destination = /^\d+$/.test(emailRequestId || "")
+        ? `/admin/certificates/create?requestId=${emailRequestId}`
+        : getPostLoginPath(location, "/admin", "/admin/login");
+
+      navigate(destination, { replace: true });
 
     } catch (err) {
-      console.error(
-        "ADMIN LOGIN ERROR:",
-        err
-      );
-
       setError(
         err?.message ||
           "Unable to sign in as administrator."
@@ -208,7 +203,7 @@ export default function AdminLogin() {
               </h1>
 
               <p className="mx-auto mt-3 max-w-sm text-[13px] leading-6 text-slate-500 sm:text-sm">
-                Secure administrator access to ESPARKS IT SOLUTIONS.
+                Secure administrator access to Esparks IT Solutions Private Limited.
               </p>
 
             </div>
@@ -395,7 +390,7 @@ export default function AdminLogin() {
 
                   <p className="mt-1 text-[10px] leading-5 text-slate-600">
                     Administrator access is restricted to
-                    authorized ESPARKS IT SOLUTIONS accounts.
+                    authorized Esparks IT Solutions Private Limited accounts.
                   </p>
 
                 </div>
@@ -449,7 +444,7 @@ export default function AdminLogin() {
 
             <span className="h-1 w-1 rounded-full bg-cyan-400/60" />
 
-            ESPARKS IT SOLUTIONS Secure Administration
+            Esparks IT Solutions Secure Administration
 
             <span className="h-1 w-1 rounded-full bg-cyan-400/60" />
 

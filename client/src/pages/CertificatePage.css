@@ -1,0 +1,195 @@
+/* ============================================================
+   CertificatePage.css — the page AROUND the certificate
+   (action bar, loading / error cards, print rules).
+
+   The certificate's own design is in
+   components/certificate/CertificateDocument.css.
+   Shared by pages/CertificateView.jsx and
+   Admin/Certificates/ViewCertificate.jsx.
+   ============================================================ */
+
+.certificate-page {
+  min-height: 100vh;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(16, 94, 160, 0.08), transparent 30%),
+    radial-gradient(circle at 80% 80%, rgba(183, 137, 72, 0.07), transparent 30%),
+    #eef2f6;
+  font-family: "Montserrat", Arial, sans-serif;
+}
+
+/* ---------------- action bar ---------------- */
+
+.certificate-actions {
+  width: 100%;
+  max-width: 1500px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.certificate-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.certificate-button {
+  min-height: 42px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #c8d2df;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #12305f;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.certificate-button:hover:not(:disabled) {
+  background: #f3f6fb;
+  border-color: #12305f;
+}
+
+.certificate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.certificate-button-primary {
+  background: #12305f;
+  border-color: #12305f;
+  color: #ffffff;
+}
+
+.certificate-button-primary:hover:not(:disabled) {
+  background: #1d4a8f;
+}
+
+.certificate-status {
+  min-height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.certificate-status-valid {
+  background: #e7f6ee;
+  color: #12804a;
+}
+
+.certificate-status-revoked {
+  background: #fdecee;
+  color: #be182c;
+}
+
+/* ---------------- certificate area ---------------- */
+
+.cert-scale-container {
+  width: 100%;
+  max-width: 1500px;
+}
+
+.cert-scale-inner .cert {
+  box-shadow: 0 20px 60px rgba(10, 31, 69, 0.18);
+}
+
+/* ---------------- loading / error ---------------- */
+
+.certificate-state-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #eef2f6;
+  font-family: "Montserrat", Arial, sans-serif;
+}
+
+.certificate-state-card {
+  max-width: 460px;
+  padding: 40px 32px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(10, 31, 69, 0.12);
+  text-align: center;
+  color: #2c3445;
+}
+
+.certificate-state-card h2 {
+  margin: 14px 0 8px;
+  color: #12305f;
+}
+
+.certificate-state-card p {
+  margin: 0 0 22px;
+  line-height: 1.6;
+}
+
+.certificate-state-icon {
+  color: #1d4a8f;
+}
+
+.certificate-state-icon.error {
+  color: #be182c;
+}
+
+.spin {
+  animation: certificate-spin 0.9s linear infinite;
+}
+
+@keyframes certificate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------- print ----------------
+   Print exactly one page: hide the UI and scale the 1500 px certificate
+   to the 297 mm page width (1122.5 px at 96 dpi -> scale 0.7483). */
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  .certificate-actions {
+    display: none !important;
+  }
+
+  .certificate-page {
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .cert-scale-container {
+    height: auto !important;
+  }
+
+  [data-cert-scaler] {
+    transform: scale(0.7483) !important;
+  }
+
+  .cert-scale-inner .cert {
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

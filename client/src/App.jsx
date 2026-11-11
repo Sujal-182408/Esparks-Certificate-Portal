@@ -1,82 +1,75 @@
+// ============================================================
+// App.jsx — every page route in the application
+// ============================================================
+//
+// PERFORMANCE: pages are loaded with React.lazy(). Vite splits each page
+// into its own JavaScript file, and the browser downloads a page's code
+// only when the user first visits it. A visitor who just scans a QR code
+// no longer downloads the whole admin panel.
+//
+// ACCESS CONTROL:
+//   <ProtectedRoute>       -> logged-in employee required
+//   <AdminProtectedRoute>  -> logged-in admin required
+// (These only improve UX. The real protection is on the server, which
+//  checks the session on every API request.)
+// ============================================================
+
+import { lazy, Suspense } from "react";
 import { Link, Route, Routes } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 
-// =========================
-// PUBLIC PAGES
-// =========================
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import EmployeeDashboard from "./pages/EmployeeDashboard";
-import VerifyCertificate from "./pages/VerifyCertificate";
-import CertificateView from "./pages/CertificateView";
-import CertificateRequest from "./pages/CertificateRequest";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-
-// =========================
-// PROTECTED ROUTES
-// =========================
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
-// =========================
-// ADMIN PAGES
-// =========================
-import AdminLogin from "./pages/AdminLogin";
-import AdminDashboard from "./Admin/AdminDashboard";
+// ---- Public ----
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyCertificate = lazy(() => import("./pages/VerifyCertificate"));
+const CertificateView = lazy(() => import("./pages/CertificateView"));
 
-// =========================
-// ADMIN CERTIFICATES
-// =========================
-import AddCertificate from "./Admin/Certificates/AddCertificate";
-import ManageCertificate from "./Admin/Certificates/ManageCertificates";
-import AdminViewCertificate from "./Admin/Certificates/ViewCertificate";
-import EditCertificate from "./Admin/Certificates/EditCertificate";
-import ReportsAnalytics from "./Admin/ReportsAnalytics";
+// ---- Employee ----
+const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
+const CertificateRequest = lazy(() => import("./pages/CertificateRequest"));
 
-// =========================
-// ADMIN CERTIFICATE REQUESTS
-// =========================
-import AdminCertificateRequest from "./Admin/AdminCertificateRequest";
+// ---- Admin ----
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminDashboard = lazy(() => import("./Admin/AdminDashboard"));
+const AdminEmployees = lazy(() => import("./Admin/Certificates/AdminEmployees"));
+const EmployeeDetails = lazy(() => import("./Admin/Certificates/EmployeeDetails"));
+const AdminCertificateRequest = lazy(() => import("./Admin/AdminCertificateRequest"));
+const ManageCertificates = lazy(() => import("./Admin/Certificates/ManageCertificates"));
+const AddCertificate = lazy(() => import("./Admin/Certificates/AddCertificate"));
+const EditCertificate = lazy(() => import("./Admin/Certificates/EditCertificate"));
+const AdminViewCertificate = lazy(() => import("./Admin/Certificates/ViewCertificate"));
+const ReportsAnalytics = lazy(() => import("./Admin/ReportsAnalytics"));
 
-// =========================
-// ADMIN EMPLOYEES
-// =========================
-import AdminEmployees from "./Admin/Certificates/AdminEmployees";
-import EmployeeDetails from "./Admin/Certificates/EmployeeDetails";
+// ---- Development only: certificate design preview with sample data ----
+// `import.meta.env.DEV` is false in production builds, so Vite removes
+// this route AND the preview page from the production bundle entirely.
+const CertificatePreview = import.meta.env.DEV ? lazy(() => import("./pages/CertificatePreview")) : null;
 
-// =========================
-// 404 PAGE
-// =========================
+/** Shown while a lazily-loaded page's code is downloading. */
+function PageLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#060a0f]">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-400" />
+    </div>
+  );
+}
+
 function NotFound() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#080b10] px-5 text-center text-white">
-      <ShieldCheck
-        size={55}
-        className="mb-5 text-cyan-400"
-      />
-
-      <h1 className="text-7xl font-extrabold">
-        404
-      </h1>
-
-      <h2 className="mt-3 text-2xl font-semibold">
-        Page Not Found
-      </h2>
-
-      <p className="mt-3 text-slate-400">
-        The page you are looking for does not exist.
-      </p>
-
+      <ShieldCheck size={55} className="mb-5 text-cyan-400" />
+      <h1 className="text-7xl font-extrabold">404</h1>
+      <h2 className="mt-3 text-2xl font-semibold">Page Not Found</h2>
+      <p className="mt-3 text-slate-400">The page you are looking for does not exist.</p>
       <Link
         to="/"
-        className="
-          mt-7 inline-flex h-11 items-center justify-center
-          rounded-xl bg-cyan-400 px-6
-          text-sm font-bold text-slate-950
-          transition hover:bg-cyan-300
-        "
+        className="mt-7 inline-flex h-11 items-center justify-center rounded-xl bg-cyan-400 px-6 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
       >
         Back to Home
       </Link>
@@ -84,229 +77,44 @@ function NotFound() {
   );
 }
 
-// =========================
-// APP
-// =========================
-function App() {
+/** Small helpers so the route table below stays readable. */
+const employeeOnly = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
+const adminOnly = (element) => <AdminProtectedRoute>{element}</AdminProtectedRoute>;
+
+export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* ---------- Public ---------- */}
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify" element={<VerifyCertificate />} />
+        <Route path="/certificate/view" element={<CertificateView />} />
 
-      {/* =====================================================
-          PUBLIC ROUTES
-      ===================================================== */}
+        {/* ---------- Employee ---------- */}
+        <Route path="/dashboard" element={employeeOnly(<EmployeeDashboard />)} />
+        <Route path="/certificate/request" element={employeeOnly(<CertificateRequest />)} />
 
-      <Route
-        path="/"
-        element={<Home />}
-      />
+        {/* ---------- Admin ---------- */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={adminOnly(<AdminDashboard />)} />
+        <Route path="/admin/employees" element={adminOnly(<AdminEmployees />)} />
+        <Route path="/admin/employees/:id" element={adminOnly(<EmployeeDetails />)} />
+        <Route path="/admin/certificate-requests" element={adminOnly(<AdminCertificateRequest />)} />
+        <Route path="/admin/certificates" element={adminOnly(<ManageCertificates />)} />
+        {/* expects ?requestId=<id> */}
+        <Route path="/admin/certificates/create" element={adminOnly(<AddCertificate />)} />
+        <Route path="/admin/certificates/:id/edit" element={adminOnly(<EditCertificate />)} />
+        <Route path="/admin/certificates/:id" element={adminOnly(<AdminViewCertificate />)} />
+        <Route path="/admin/reports" element={adminOnly(<ReportsAnalytics />)} />
 
-     <Route
-  path="/login"
-  element={
-   
-      <Login />
-  
-  }
-/>
-<Route
-  path="/register"
-  element={
-  
-      <Register />
-   
-  }
-/>
-      <Route
-        path="/forgot-password"
-        element={<ForgotPassword />}
-      />
+        {CertificatePreview && <Route path="/dev/certificate-preview" element={<CertificatePreview />} />}
 
-      <Route
-        path="/reset-password"
-        element={<ResetPassword />}
-      />
-
-      <Route
-        path="/verify"
-        element={<VerifyCertificate />}
-      />
-
-      <Route
-        path="/certificate/view"
-        element={<CertificateView />}
-      />
-
-     <Route
-  path="/certificate/request"
-  element={
-   
-      <ProtectedRoute>
-        <CertificateRequest />
-      </ProtectedRoute>
-  
-  }
-/>
-
-
-      {/* =====================================================
-          EMPLOYEE DASHBOARD
-      ===================================================== */}
-
-    <Route
-  path="/dashboard"
-  element={
-   
-      <ProtectedRoute>
-        <EmployeeDashboard />
-      </ProtectedRoute>
-    
-  }
-/>
-
-      {/* =====================================================
-          ADMIN LOGIN
-      ===================================================== */}
-
-      <Route
-        path="/admin/login"
-        element={<AdminLogin />}
-      />
-
-      {/* =====================================================
-          ADMIN DASHBOARD
-      ===================================================== */}
-
-      <Route
-        path="/admin"
-        element={
-          <AdminProtectedRoute>
-            <AdminDashboard />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          ADMIN EMPLOYEES
-      ===================================================== */}
-
-      <Route
-        path="/admin/employees"
-        element={
-          <AdminProtectedRoute>
-            <AdminEmployees />
-          </AdminProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/admin/employees/:id"
-        element={
-          <AdminProtectedRoute>
-            <EmployeeDetails />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          ADMIN CERTIFICATE REQUESTS
-      ===================================================== */}
-
-      <Route
-        path="/admin/certificate-requests"
-        element={
-          <AdminProtectedRoute>
-            <AdminCertificateRequest />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          ADMIN CERTIFICATES
-      ===================================================== */}
-
-      <Route
-        path="/admin/certificates"
-        element={
-          <AdminProtectedRoute>
-            <ManageCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          CREATE CERTIFICATE
-          
-          IMPORTANT:
-          This route expects:
-          
-          /admin/certificates/create?requestId=14
-      ===================================================== */}
-
-      <Route
-        path="/admin/certificates/create"
-        element={
-          <AdminProtectedRoute>
-            <AddCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          EDIT CERTIFICATE
-
-          Example:
-          /admin/certificates/14/edit
-      ===================================================== */}
-
-      <Route
-        path="/admin/certificates/:id/edit"
-        element={
-          <AdminProtectedRoute>
-            <EditCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-          VIEW CERTIFICATE
-
-          Example:
-          /admin/certificates/14
-      ===================================================== */}
-
-      <Route
-        path="/admin/certificates/:id"
-        element={
-          <AdminProtectedRoute>
-            <AdminViewCertificate />
-          </AdminProtectedRoute>
-        }
-      />
-
-      {/* =====================================================
-      =     ADMIN REPORTS & ANALYTICS
-      ===================================================== */}
-
-      <Route
-  path="/admin/reports"
-  element={
-    <AdminProtectedRoute>
-      <ReportsAnalytics />
-    </AdminProtectedRoute>
-  }
-/>
-
-      {/* =====================================================
-          404
-      ===================================================== */}
-
-      <Route
-        path="*"
-        element={<NotFound />}
-      />
-
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
-
-export default App;

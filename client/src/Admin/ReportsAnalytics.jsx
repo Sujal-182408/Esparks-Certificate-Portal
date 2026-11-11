@@ -2,14 +2,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Award, Clock3, Users, Ban, TrendingUp, TrendingDown,
-  RefreshCw, CalendarDays, BarChart3, PieChart,
-  Activity, FileText, CheckCircle2, XCircle,
-  AlertCircle, ArrowUpRight, LoaderCircle, ArrowLeft
+  Award,
+  Clock3,
+  Users,
+  Ban,
+  TrendingDown,
+  RefreshCw,
+  CalendarDays,
+  BarChart3,
+  PieChart,
+  Activity,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  LoaderCircle,
+  ArrowLeft,
 } from "lucide-react";
+import {
+  getAdminCertificateRequests,
+  getAdminCertificates,
+  getAdminEmployees,
+} from "../services/api";
 import "./ReportsAnalytics.css";
-
-const API = "/api";
 
 const getList = (data, keys) => {
   for (const key of keys) {
@@ -32,8 +46,15 @@ const getMonthKey = (date) => {
 const formatNumber = (number) =>
   new Intl.NumberFormat("en-IN").format(number || 0);
 
-const getInitials = (name = "") =>
-  name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+
+// Each report source: a label for error messages, the shared API helper
+// (correct backend URL + admin session cookie), and the response key.
+// Defined outside the component so it is created once, not on every render.
+const REPORT_SOURCES = [
+  { name: "Employees", load: getAdminEmployees, keys: ["employees", "data"] },
+  { name: "Certificates", load: getAdminCertificates, keys: ["certificates", "data"] },
+  { name: "Certificate Requests", load: getAdminCertificateRequests, keys: ["requests", "data"] },
+];
 
 export default function ReportsAnalytics() {
 const navigate = useNavigate();
@@ -46,88 +67,46 @@ const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
- 
-const loadReports = async (refresh = false) => {
-  try {
-    if (refresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    setError("");
-
-    const endpoints = [
-      {
-        name: "Employees",
-        url: `${API}/admin/employees`,
-        keys: ["employees", "data"]
-      },
-      {
-        name: "Certificates",
-        url: `${API}/admin/certificates`,
-        keys: ["certificates", "data"]
-      },
-      {
-        name: "Certificate Requests",
-        url: `${API}/admin/certificate-requests`,
-        keys: ["requests", "data"]
+  const loadReports = async (refresh = false) => {
+    try {
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    ];
+      setError("");
 
-    const results = await Promise.all(
-      endpoints.map(async (endpoint) => {
-        const response = await fetch(endpoint.url, {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json"
+      // The three requests are independent, so run them in parallel.
+      // A failure names the source and HTTP status, e.g.
+      // "Certificates API failed (401): Admin authentication required."
+      const [employeeList, certificateList, requestList] = await Promise.all(
+        REPORT_SOURCES.map(async ({ name, load, keys }) => {
+          try {
+            return getList(await load(), keys);
+          } catch (err) {
+            // `cause` keeps the original error (status, response data)
+            // available for debugging.
+            throw new Error(
+              err.status
+                ? `${name} API failed (${err.status}): ${err.message}`
+                : `${name}: ${err.message}`,
+              { cause: err },
+            );
           }
-        });
+        }),
+      );
 
-        const responseText = await response.text();
-
-        let data = {};
-
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch {
-          throw new Error(
-            `${endpoint.name}: Server returned an invalid response.`
-          );
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            `${endpoint.name} API failed (${response.status}): ${
-              data.message || data.error || response.statusText
-            }`
-          );
-        }
-
-        return {
-          name: endpoint.name,
-          data: getList(data, endpoint.keys)
-        };
-      })
-    );
-
-    setEmployees(results[0].data);
-    setCertificates(results[1].data);
-    setRequests(results[2].data);
-
-  } catch (err) {
-    console.error("Reports analytics error:", err);
-
-    setError(
-      err.message || "Unable to load reports. Please try again."
-    );
-
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+      setEmployees(employeeList);
+      setCertificates(certificateList);
+      setRequests(requestList);
+    } catch (err) {
+      console.error("Reports analytics error:", err);
+      setError(err.message || "Unable to load reports. Please try again.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -284,7 +263,6 @@ const loadReports = async (refresh = false) => {
   const statusTotal = stats.issued + stats.revoked + stats.expired;
   const issuedPercent = statusTotal ? (stats.issued / statusTotal) * 100 : 0;
   const revokedPercent = statusTotal ? (stats.revoked / statusTotal) * 100 : 0;
-  const expiredPercent = statusTotal ? (stats.expired / statusTotal) * 100 : 0;
 
   if (loading) {
     return (
@@ -545,7 +523,7 @@ const loadReports = async (refresh = false) => {
 
         <footer className="reports-footer">
           <span><Activity size={14} /> Analytics generated from portal records</span>
-          <span>eSparks IT Solutions</span>
+          <span>Esparks IT Solutions Private Limited</span>
         </footer>
       </div>
     </main>

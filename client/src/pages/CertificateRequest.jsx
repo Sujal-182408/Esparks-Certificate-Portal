@@ -240,7 +240,7 @@ if (["INTR", "EXPR"].includes(cleanCertificateType)) {
           />
 
           <p className="mt-5 text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">
-            ESPARKS IT SOLUTIONS
+            Esparks IT Solutions
           </p>
 
           <p className="mt-2 text-sm text-slate-500">
