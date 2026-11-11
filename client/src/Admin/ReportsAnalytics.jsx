@@ -84,10 +84,13 @@ const navigate = useNavigate();
           try {
             return getList(await load(), keys);
           } catch (err) {
+            // `cause` keeps the original error (status, response data)
+            // available for debugging.
             throw new Error(
               err.status
                 ? `${name} API failed (${err.status}): ${err.message}`
                 : `${name}: ${err.message}`,
+              { cause: err },
             );
           }
         }),
