@@ -443,6 +443,7 @@ app.use(
 // ============================================================
 
 const httpServer = http.createServer(app);
+export { httpServer };
 
 // ============================================================
 // 13. SOCKET.IO INITIALIZATION

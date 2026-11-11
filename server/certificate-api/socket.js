@@ -1,3 +1,4 @@
+
 // ============================================================
 // socket.js — Real-Time Notifications (Socket.IO)
 // ============================================================
@@ -17,14 +18,10 @@
 //
 // VERCEL
 // ------
-// Vercel serverless functions cannot maintain persistent
-// WebSocket connections.
+// Uses the WebSocket transport with the configured Vercel
+// function endpoint. Notifications also remain stored in the
+// database and can be retrieved through REST APIs.
 //
-// Real-time notifications work when the API runs as a
-// long-lived Node.js process.
-//
-// When Socket.IO is unavailable, notifications remain stored
-// in the database and can be retrieved through REST APIs.
 // ============================================================
 
 
@@ -33,9 +30,7 @@
 // ============================================================
 
 import { Server } from "socket.io";
-
 import jwt from "jsonwebtoken";
-
 import pool from "./config/db.js";
 
 import {
@@ -240,6 +235,9 @@ export function initializeSocket(
 
   // Create Socket.IO server.
   io = new Server(httpServer, {
+    // Vercel function endpoint.
+    path: "/api/socket.io",
+
     cors: {
       origin: [...trustedOrigins],
       credentials: true,

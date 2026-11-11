@@ -9,6 +9,13 @@
 // Socket.IO is therefore not available on Vercel (see socket.js).
 // ============================================================
 
-import app from "../app.js";
 
-export default app;
+
+ // ============================================================
+ // api/index.js — Vercel server entry point
+ // ============================================================
+
+import { httpServer } from "../server.js";
+
+export default httpServer;
+

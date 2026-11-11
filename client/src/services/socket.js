@@ -1,6 +1,10 @@
 
 import { io } from "socket.io-client";
 
+// ============================================================
+// SOCKET SERVER URL
+// ============================================================
+
 const SOCKET_URL = (
   import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV
@@ -8,8 +12,18 @@ const SOCKET_URL = (
     : "https://esparks-certificate-portal-server.vercel.app")
 ).replace(/\/+$/, "");
 
+
+// ============================================================
+// SOCKET INSTANCE
+// ============================================================
+
 let socket = null;
 let activeRole = null;
+
+
+// ============================================================
+// CONNECT SOCKET
+// ============================================================
 
 export function connectSocket(role = "employee") {
   if (!["employee", "admin"].includes(role)) {
@@ -20,37 +34,78 @@ export function connectSocket(role = "employee") {
   if (socket && activeRole !== role) {
     socket.disconnect();
     socket = null;
+    activeRole = null;
   }
 
   if (!socket) {
     activeRole = role;
 
     socket = io(SOCKET_URL, {
+      // Vercel Socket.IO endpoint.
+      path: "/api/socket.io",
+
+      // Connect manually after initialization.
       autoConnect: false,
+
+      // Send HTTP-only authentication cookies.
       withCredentials: true,
-      transports: ["websocket", "polling"],
+
+      // Vercel WebSocket connection.
+      transports: ["websocket"],
+
+      // Automatic reconnection.
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
+
+    // --------------------------------------------------------
+    // CONNECTED
+    // --------------------------------------------------------
 
     socket.on("connect", () => {
-      console.log(`[SOCKET] ${activeRole} connected:`, socket.id);
+      console.log(
+        `[SOCKET] ${activeRole} connected:`,
+        socket.id,
+      );
     });
+
+    // --------------------------------------------------------
+    // CONNECTION ERROR
+    // --------------------------------------------------------
 
     socket.on("connect_error", (error) => {
-      console.error("[SOCKET] Connection failed:", error.message);
+      console.error(
+        "[SOCKET] Connection failed:",
+        error.message,
+      );
     });
+
+    // --------------------------------------------------------
+    // DISCONNECTED
+    // --------------------------------------------------------
 
     socket.on("disconnect", (reason) => {
-      console.log("[SOCKET] Disconnected:", reason);
+      console.log(
+        "[SOCKET] Disconnected:",
+        reason,
+      );
     });
 
+    // --------------------------------------------------------
+    // NOTIFICATION ERROR
+    // --------------------------------------------------------
+
     socket.on("notification:error", (data) => {
-      console.error("[SOCKET] Notification error:", data?.message);
+      console.error(
+        "[SOCKET] Notification error:",
+        data?.message,
+      );
     });
   }
 
+  // Connect if not already connected.
   if (!socket.connected) {
     socket.connect();
   }
@@ -58,9 +113,19 @@ export function connectSocket(role = "employee") {
   return socket;
 }
 
+
+// ============================================================
+// GET SOCKET INSTANCE
+// ============================================================
+
 export function getSocket() {
   return socket;
 }
+
+
+// ============================================================
+// DISCONNECT SOCKET
+// ============================================================
 
 export function disconnectSocket(role) {
   // Prevent one authentication flow from disconnecting another role.
