@@ -40,9 +40,10 @@ export function connectSocket(role = "employee") {
   if (!socket) {
     activeRole = role;
 
-    socket = io(SOCKET_URL, {
-      // Vercel Socket.IO endpoint.
-      path: "/api/socket.io",
+  socket = io(SOCKET_URL, {
+  // Vercel Socket.IO endpoint.
+  path: "/api/socket.io",
+  addTrailingSlash: false,
 
       // Connect manually after initialization.
       autoConnect: false,
