@@ -27,6 +27,8 @@ import nipLogo from "../assets/nipLogo.png";
 import msmeLogo from "../assets/msmeLogo.png";
 import isoLogo from "../assets/iso-logo.png";
 
+import CertificateDocument from "../components/certificate/CertificateDocument";
+
 import "./CertificatePage.css";
 
 const UUID_REGEX =
@@ -579,147 +581,16 @@ export default function VerifyCertificate() {
 
                 {/* FULL-WIDTH CENTERED CERTIFICATE PREVIEW */}
                 <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-auto overflow-y-hidden">
-                  <div className="mx-auto flex w-max min-w-full justify-center">
-                    <div className="w-[1380px] min-w-[1380px] shrink-0">
-                      <article
-                        ref={certificateRef}
-                        className="certificate-document"
-                      >
-                        <img
-                          src={companyLogo}
-                          alt=""
-                          aria-hidden="true"
-                          className="certificate-watermark"
-                        />
-
-                        <div className="certificate-frame">
-                          <div className="certificate-frame-inner">
-                            <span className="frame-corner frame-tl" />
-                            <span className="frame-corner frame-tr" />
-                            <span className="frame-corner frame-bl" />
-                            <span className="frame-corner frame-br" />
-                          </div>
-                        </div>
-
-                        <div className="certificate-top-id">
-                          <span>CERTIFICATE-ID:<br /></span>
-                          {certificate.certificateNo}
-                        </div>
-
-                        <header className="certificate-header">
-                          <div className="certificate-logo-left">
-                            <img src={companyLogo} alt="eSparks IT Solutions" />
-                          </div>
-
-                          <div className="certificate-top-icon">
-                            <GraduationCap className="certificate-graduation-icon" />
-                          </div>
-                        </header>
-
-                        <section className="certificate-title-section">
-                          <h1>CERTIFICATE</h1>
-                          <h2>{certificateType.heading}</h2>
-                          <div className="certificate-title-line" />
-                        </section>
-
-                        <section className="certificate-recipient-section">
-                          <p className="certificate-awarded-text">
-                            THIS CERTIFICATE IS AWARDED TO
-                          </p>
-
-                          <h3 className="certificate-recipient">
-                            {toTitleCase(certificate.recipientName)}
-                          </h3>
-                        </section>
-
-                        <section className="certificate-description-section">
-                          <p className="certificate-description-text">
-                            {description}
-                            <br />
-                            <span className="certificate-appreciation-text">
-                              We appreciate your contribution and wish you
-                              success in your future endeavors.
-                            </span>
-                          </p>
-                        </section>
-
-                        <section className="certificate-bottom">
-                          <div className="certificate-qr">
-                            {verificationUrl ? (
-                              <>
-                                <div className="certificate-qr-box">
-                                  <QRCodeSVG
-                                    value={verificationUrl}
-                                    size={105}
-                                    bgColor="#ffffff"
-                                    fgColor="#000000"
-                                    level="H"
-                                    includeMargin={false}
-                                  />
-                                </div>
-                                <span className="certificate-qr-label">
-                                  SCAN TO VERIFY
-                                </span>
-                              </>
-                            ) : (
-                              <div className="certificate-qr-unavailable">
-                                QR unavailable
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="certificate-signature">
-                            <img src={sign} alt="Authorized Signatory" />
-                            <div className="signature-line" />
-                            <strong>Founder &amp; CEO</strong>
-                            <span>{certificate.issuerName}</span>
-                          </div>
-
-                          <img src={nipLogo} alt="NIP" className="certificate-nip-logo" />
-                          <img src={isoLogo} alt="ISO" className="certificate-iso-logo" />
-                          <img src={msmeLogo} alt="MSME" className="certificate-msme-logo" />
-                        </section>
-
-                        <footer className="certificate-footer">
-                          <span>Certificate No. {certificate.certificateNo}</span>
-                          <span className="footer-dot">•</span>
-                          <span>Issued: {issueDate}</span>
-                          <span className="footer-dot">•</span>
-                          <span>Verified by {certificate.issuerName}</span>
-                        </footer>
-
-                        {!isValid && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: "rgba(255,255,255,0.35)",
-                              zIndex: 20,
-                              pointerEvents: "none",
-                            }}
-                          >
-                            <div
-                              style={{
-                                border: "8px solid #dc2626",
-                                color: "#dc2626",
-                                padding: "18px 45px",
-                                fontSize: "48px",
-                                fontWeight: 900,
-                                letterSpacing: "8px",
-                                transform: "rotate(-18deg)",
-                                background: "rgba(255,255,255,0.85)",
-                              }}
-                            >
-                              {isRevoked ? "REVOKED" : "INVALID"}
-                            </div>
-                          </div>
-                        )}
-                      </article>
-                    </div>
-                  </div>
+                {/* FULL-WIDTH CERTIFICATE PREVIEW */}
+<div className="certificate-preview-scroll">
+  <div className="certificate-preview-inner">
+    <CertificateDocument
+      ref={certificateRef}
+      certificate={certificate}
+      verificationUrl={verificationUrl}
+    />
+  </div>
+</div>
                 </div>
 
                 {!isValid && (

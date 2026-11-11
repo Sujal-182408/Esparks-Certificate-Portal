@@ -17,7 +17,7 @@
 // Admin sessions are separate and are checked by <AdminProtectedRoute>.
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./authContextObject";
 import { apiRequest } from "../services/api";
 import { connectSocket, disconnectSocket } from "../services/socket";

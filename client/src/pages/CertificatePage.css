@@ -1,15 +1,20 @@
-/* ============================================================
-   CertificatePage.css — the page AROUND the certificate
-   (action bar, loading / error cards, print rules).
 
-   The certificate's own design is in
-   components/certificate/CertificateDocument.css.
-   Shared by pages/CertificateView.jsx and
-   Admin/Certificates/ViewCertificate.jsx.
+/* ============================================================
+   CertificatePage.css — page around the certificate
+   Action bar, loading/error cards, preview and print rules.
+
+   Certificate design:
+   components/certificate/CertificateDocument.css
+
+   Shared by employee, public and admin certificate views.
    ============================================================ */
+
+/* ---------------- page layout ---------------- */
 
 .certificate-page {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   padding: 28px;
   display: flex;
   flex-direction: column;
@@ -20,6 +25,7 @@
     radial-gradient(circle at 80% 80%, rgba(183, 137, 72, 0.07), transparent 30%),
     #eef2f6;
   font-family: "Montserrat", Arial, sans-serif;
+  overflow-x: clip;
 }
 
 /* ---------------- action bar ---------------- */
@@ -99,15 +105,68 @@
   color: #be182c;
 }
 
-/* ---------------- certificate area ---------------- */
+/* ---------------- certificate preview ---------------- */
 
 .cert-scale-container {
   width: 100%;
   max-width: 1500px;
+  overflow: hidden;
 }
 
 .cert-scale-inner .cert {
   box-shadow: 0 20px 60px rgba(10, 31, 69, 0.18);
+}
+
+/* Public verification certificate wrapper */
+.certificate-preview-scroll {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  /* Firefox */
+  scrollbar-width: none;
+
+  /* Internet Explorer / old Edge */
+  -ms-overflow-style: none;
+}
+
+/* Chrome, Safari and Chromium Edge */
+.certificate-preview-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.certificate-preview-inner {
+  display: flex;
+  justify-content: center;
+  width: 1500px;
+  min-width: 1500px;
+  margin: 0 auto;
+}
+
+/* Hide scrollbars on certificate containers without disabling scrolling */
+.certificate-page,
+.cert-scale-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.certificate-page::-webkit-scrollbar,
+.cert-scale-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Prevent the certificate from creating page-level horizontal overflow */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* ---------------- loading / error ---------------- */
@@ -160,14 +219,18 @@
   }
 }
 
-/* ---------------- print ----------------
-   Print exactly one page: hide the UI and scale the 1500 px certificate
-   to the 297 mm page width (1122.5 px at 96 dpi -> scale 0.7483). */
+/* ---------------- print ---------------- */
 
 @media print {
   @page {
     size: A4 landscape;
     margin: 0;
+  }
+
+  html,
+  body,
+  #root {
+    overflow: visible !important;
   }
 
   .certificate-actions {
@@ -177,10 +240,16 @@
   .certificate-page {
     padding: 0;
     background: #ffffff;
+    overflow: visible;
+  }
+
+  .certificate-preview-scroll {
+    overflow: visible !important;
   }
 
   .cert-scale-container {
     height: auto !important;
+    overflow: visible !important;
   }
 
   [data-cert-scaler] {

@@ -1,3 +1,4 @@
+
 // ============================================================
 // routes/adminCertificates.routes.js — mounted at /api/admin/certificates
 // ============================================================
@@ -31,11 +32,17 @@ const DEFAULT_ISSUER = "Esparks IT Solutions Private Limited";
 const DEFAULT_REVOKE_REASON = "Certificate revoked by administrator.";
 
 router.get("/", async (req, res) => {
-  res.json({ success: true, certificates: await certificateService.listCertificates() });
+  res.json({
+    success: true,
+    certificates: await certificateService.listCertificates(),
+  });
 });
 
 router.get("/:id", async (req, res) => {
-  const certificate = await certificateService.getCertificateById(parseId(req.params.id, "certificate"));
+  const certificate = await certificateService.getCertificateById(
+    parseId(req.params.id, "certificate")
+  );
+
   res.json({ success: true, certificate });
 });
 
@@ -43,19 +50,64 @@ router.post("/", async (req, res) => {
   const body = req.body || {};
 
   // 1. Validate and normalise everything BEFORE touching the database.
+  const certificateType = parseCertificateType(
+    body.certificateType,
+    "CERT"
+  );
+
+  // Experience duration is provided in total months by the frontend.
+  // It is required only for EXPR certificates.
+  let durationMonths = null;
+
+  if (certificateType === "EXPR") {
+    const duration = Number(body.durationMonths);
+
+    if (
+      body.durationMonths === undefined ||
+      body.durationMonths === null ||
+      body.durationMonths === "" ||
+      !Number.isInteger(duration) ||
+      duration < 1 ||
+      duration > 600
+    ) {
+      throw badRequest(
+        "Experience duration must be between 1 and 600 months."
+      );
+    }
+
+    durationMonths = duration;
+  }
+
   const input = {
     requestId: parseId(body.requestId, "certificate request"),
-    certificateType: parseCertificateType(body.certificateType, "CERT"),
-    courseName: cleanText(body.courseName, { label: "Course name", max: 200, required: true }),
-    issuerName: cleanText(body.issuerName || DEFAULT_ISSUER, { label: "Issuer name", max: 200, required: true }),
+    certificateType,
+    courseName: cleanText(body.courseName, {
+      label: "Course name",
+      max: 200,
+      required: true,
+    }),
+    issuerName: cleanText(body.issuerName || DEFAULT_ISSUER, {
+      label: "Issuer name",
+      max: 200,
+      required: true,
+    }),
     issueDate: parseOptionalDate(body.issueDate),
+
+    // Store experience duration in months.
+    durationMonths,
   };
 
   // 2. Business logic lives in the service.
-  const { certificate, request } = await certificateService.issueCertificate(input, req.admin);
+  const { certificate, request } =
+    await certificateService.issueCertificate(input, req.admin);
 
   // 3. 201 Created = a new resource was created.
-  res.status(201).json({ success: true, message: "Certificate created successfully.", certificate, request });
+  res.status(201).json({
+    success: true,
+    message: "Certificate created successfully.",
+    certificate,
+    request,
+  });
 });
 
 router.put("/:id", async (req, res) => {
@@ -63,14 +115,32 @@ router.put("/:id", async (req, res) => {
   const body = req.body || {};
 
   const changes = {
-    courseName: optionalText(body.courseName, { label: "Course name", max: 200 }),
-    issuerName: optionalText(body.issuerName, { label: "Issuer name", max: 200 }),
-    recipientName: optionalText(body.recipientName, { label: "Recipient name", max: 150 }),
+    courseName: optionalText(body.courseName, {
+      label: "Course name",
+      max: 200,
+    }),
+    issuerName: optionalText(body.issuerName, {
+      label: "Issuer name",
+      max: 200,
+    }),
+    recipientName: optionalText(body.recipientName, {
+      label: "Recipient name",
+      max: 150,
+    }),
     issueDate: parseOptionalDate(body.issueDate),
   };
 
-  const certificate = await certificateService.updateCertificate(id, changes, req.admin);
-  res.json({ success: true, message: "Certificate updated successfully.", certificate });
+  const certificate = await certificateService.updateCertificate(
+    id,
+    changes,
+    req.admin
+  );
+
+  res.json({
+    success: true,
+    message: "Certificate updated successfully.",
+    certificate,
+  });
 });
 
 router.patch("/:id/revoke", async (req, res) => {
@@ -82,12 +152,15 @@ router.patch("/:id/revoke", async (req, res) => {
   }
 
   const cleanReason =
-    cleanText(reason, { label: "Revocation reason", max: 2000 }) || DEFAULT_REVOKE_REASON;
+    cleanText(reason, {
+      label: "Revocation reason",
+      max: 2000,
+    }) || DEFAULT_REVOKE_REASON;
 
   const result = await certificateService.revokeCertificate(
     id,
     { reason: cleanReason, deactivateEmployee },
-    req.admin,
+    req.admin
   );
 
   res.json({
@@ -100,7 +173,11 @@ router.patch("/:id/revoke", async (req, res) => {
 });
 
 router.post("/:id/delete-otp", async (req, res) => {
-  const result = await certificateService.requestDeleteOtp(parseId(req.params.id, "certificate"), req.admin);
+  const result = await certificateService.requestDeleteOtp(
+    parseId(req.params.id, "certificate"),
+    req.admin
+  );
+
   res.json({ success: true, ...result });
 });
 
@@ -112,8 +189,17 @@ router.post("/:id/confirm-delete", async (req, res) => {
     throw badRequest("A valid verification OTP is required.");
   }
 
-  const certificate = await certificateService.confirmDelete(id, { challengeId, otp }, req.admin);
-  res.json({ success: true, message: "Certificate verified and deleted successfully.", certificate });
+  const certificate = await certificateService.confirmDelete(
+    id,
+    { challengeId, otp },
+    req.admin
+  );
+
+  res.json({
+    success: true,
+    message: "Certificate verified and deleted successfully.",
+    certificate,
+  });
 });
 
 export default router;

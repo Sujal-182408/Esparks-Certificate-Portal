@@ -124,9 +124,11 @@ async function reserveCertificateNumber(client, certificateType) {
 
 /**
  * @param {{ requestId: number, certificateType: string, courseName: string,
- *           issuerName: string, issueDate: string|null }} input  already validated
+ *           issuerName: string, issueDate: string|null,
+ *           durationMonths: number|null }} input  already validated
  * @param {{ email: string }} admin
  */
+
 export async function issueCertificate(input, admin) {
   const { certificate, request, notification, employee } = await withTransaction(async (client) => {
     // FOR UPDATE locks the request row: if two admins click "Issue" at the
@@ -179,14 +181,29 @@ export async function issueCertificate(input, admin) {
     );
     const newCertificate = inserted.rows[0];
 
-    const updated = await client.query(
-      `UPDATE certificate_requests
-          SET status = 'issued', certificate_id = $1,
-              reviewed_at = NOW(), issued_at = NOW()
-        WHERE id = $2 AND status = 'pending'
-        RETURNING *`,
-      [newCertificate.id, input.requestId],
-    );
+ // Save the experience duration on the certificate request.
+// CERT and INTR retain their existing duration values.
+// EXPR receives the duration entered by the admin in total months.
+const updated = await client.query(
+  `UPDATE certificate_requests
+      SET status = 'issued',
+          certificate_id = $1,
+          reviewed_at = NOW(),
+          issued_at = NOW(),
+          duration_months = CASE
+            WHEN $3::integer IS NOT NULL THEN $3::integer
+            ELSE duration_months
+          END
+    WHERE id = $2 AND status = 'pending'
+    RETURNING *`,
+  [
+    newCertificate.id,
+    input.requestId,
+    input.certificateType === "EXPR"
+      ? input.durationMonths
+      : null,
+  ],
+);
 
     await writeAuditLog(client, {
       action: "CERTIFICATE_CREATED",

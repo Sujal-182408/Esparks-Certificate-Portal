@@ -19,7 +19,7 @@ const UUID_REGEX =
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const CERTIFICATE_TYPES = ["CERT", "INTR"];
+export const CERTIFICATE_TYPES = ["CERT", "INTR", "EXPR"];
 
 /** Positive integer database ID, e.g. "/certificates/42". */
 export function parseId(value, label = "record") {
@@ -72,7 +72,7 @@ export function optionalText(value, { label, max }) {
 export function parseCertificateType(value, fallback = "") {
   const type = String(value || fallback).trim().toUpperCase();
   if (!CERTIFICATE_TYPES.includes(type)) {
-    throw badRequest("Certificate type must be CERT or INTR.");
+    throw badRequest("Certificate type must be CERT, INTR, or EXPR.");
   }
   return type;
 }

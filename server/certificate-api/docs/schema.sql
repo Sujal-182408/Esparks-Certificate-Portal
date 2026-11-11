@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS employee_users (
 CREATE TABLE IF NOT EXISTS certificates (
   id                  BIGSERIAL PRIMARY KEY,
   certificate_no      TEXT NOT NULL UNIQUE,            -- EITS-CERT-2026-1002
-  certificate_type    TEXT NOT NULL CHECK (certificate_type IN ('CERT', 'INTR')),
+  certificate_type    TEXT NOT NULL CHECK (certificate_type IN ('CERT', 'INTR', 'EXPR')),
   employee_id         BIGINT REFERENCES employee_users(id) ON DELETE SET NULL,
   recipient_name      VARCHAR(150) NOT NULL,
   course_name         VARCHAR(200) NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS certificates (
 CREATE TABLE IF NOT EXISTS certificate_requests (
   id                  BIGSERIAL PRIMARY KEY,
   employee_id         BIGINT NOT NULL REFERENCES employee_users(id) ON DELETE CASCADE,
-  certificate_type    TEXT NOT NULL CHECK (certificate_type IN ('CERT', 'INTR')),
+  certificate_type    TEXT NOT NULL CHECK (certificate_type IN ('CERT', 'INTR', 'EXPR')),
   course_name         VARCHAR(200) NOT NULL,
   additional_details  VARCHAR(2000),
   duration_months     SMALLINT CHECK (duration_months BETWEEN 1 AND 24),

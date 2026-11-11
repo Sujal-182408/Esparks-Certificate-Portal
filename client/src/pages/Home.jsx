@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
 import { ArrowRight, BadgeCheck, QrCode } from "lucide-react";
-import brandLogo from "../assets/brand.png";
+import brandLogo from "../assets/logo.png";
 import Navbar from "../components/Navbar";
 
 export default function Home() {

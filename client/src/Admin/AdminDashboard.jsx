@@ -36,8 +36,8 @@ import {
   markAllAdminNotificationsAsRead,
 } from "../services/api";
 
-import brandLogo from "/logo.png";
-import banner from "/banner.png";
+import brandLogo from "../assets/logo.png";
+import banner from "../assets/banner.png";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();

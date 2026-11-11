@@ -27,26 +27,44 @@ export default function AddCertificate() {
 
   const [certificateType, setCertificateType] = useState("");
   const [courseName, setCourseName] = useState("");
-  const [issuerName, setIssuerName] = useState("Esparks IT Solutions Private Limited");
+  const [issuerName, setIssuerName] = useState(
+    "Esparks IT Solutions Private Limited"
+  );
   const [issueDate, setIssueDate] = useState(
     new Date().toISOString().split("T")[0]
   );
 
+  // Experience duration is entered in years and additional months.
+  // It is converted into total months before sending it to the backend.
+  const [experienceYears, setExperienceYears] = useState("0");
+  const [experienceMonths, setExperienceMonths] = useState("0");
+
+  const experienceDurationMonths =
+    Number(experienceYears || 0) * 12 +
+    Number(experienceMonths || 0);
+
+  // Convert certificate type codes into readable labels.
   const certificateTypeLabel = (type) => {
     if (type === "CERT") return "Certificate";
     if (type === "INTR") return "Internship";
+    if (type === "EXPR") return "Experience Certificate";
     return type || "—";
   };
 
   const requestNumber = request?.id ?? request?.request_id ?? requestId;
   const employeeName = request?.employee_name ?? request?.employeeName ?? "—";
-  const employeeEmail = request?.employee_email ?? request?.employeeEmail ?? "—";
+  const employeeEmail =
+    request?.employee_email ?? request?.employeeEmail ?? "—";
+
   const requestedCertificateType =
     request?.certificate_type ?? request?.certificateType ?? "";
+
   const requestedCourse = request?.course_name ?? request?.courseName ?? "—";
+
   const requestedDuration =
     request?.duration_months ?? request?.durationMonths;
 
+  // Load the selected certificate request.
   useEffect(() => {
     let mounted = true;
 
@@ -92,16 +110,34 @@ export default function AddCertificate() {
         if (!mounted) return;
 
         setRequest(loadedRequest);
-        setCertificateType(
+
+        const loadedType = String(
           loadedRequest.certificate_type ??
           loadedRequest.certificateType ??
           ""
-        );
+        ).trim().toUpperCase();
+
+        setCertificateType(loadedType);
+
         setCourseName(
           loadedRequest.course_name ??
           loadedRequest.courseName ??
           ""
         );
+
+        // Restore an existing duration if the request already has one.
+        if (loadedType === "EXPR") {
+          const duration = Number(
+            loadedRequest.duration_months ??
+            loadedRequest.durationMonths ??
+            0
+          );
+
+          if (Number.isInteger(duration) && duration > 0) {
+            setExperienceYears(String(Math.floor(duration / 12)));
+            setExperienceMonths(String(duration % 12));
+          }
+        }
       } catch (error) {
         console.error("Load certificate request error:", error);
 
@@ -123,6 +159,7 @@ export default function AddCertificate() {
     };
   }, [requestId, validRequestId]);
 
+  // Validate the form and create the certificate.
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -135,6 +172,11 @@ export default function AddCertificate() {
 
     if (!certificateType) {
       setError("Certificate type is required.");
+      return;
+    }
+
+    if (!["CERT", "INTR", "EXPR"].includes(certificateType)) {
+      setError("Please select a valid certificate type.");
       return;
     }
 
@@ -153,15 +195,44 @@ export default function AddCertificate() {
       return;
     }
 
+    // Experience duration is mandatory only for EXPR certificates.
+    if (certificateType === "EXPR") {
+      const years = Number(experienceYears);
+      const months = Number(experienceMonths);
+
+      if (
+        experienceYears.trim() === "" ||
+        experienceMonths.trim() === "" ||
+        !Number.isInteger(years) ||
+        years < 0 ||
+        years > 50 ||
+        !Number.isInteger(months) ||
+        months < 0 ||
+        months > 11 ||
+        experienceDurationMonths <= 0
+      ) {
+        setError(
+          "Enter a valid experience duration in years and months."
+        );
+        return;
+      }
+    }
+
     try {
       setSaving(true);
 
+      // Send experience duration in total months.
+      // The backend must save this value for EXPR certificates.
       const payload = {
         requestId: Number(requestId),
         certificateType,
         courseName: courseName.trim(),
         issuerName: issuerName.trim(),
         issueDate,
+        durationMonths:
+          certificateType === "EXPR"
+            ? experienceDurationMonths
+            : null,
       };
 
       const data = await apiRequest("/admin/certificates", {
@@ -171,6 +242,7 @@ export default function AddCertificate() {
 
       const certificate =
         data?.certificate ?? data?.data ?? data;
+
       const certificateId = Number(certificate?.id);
 
       if (!Number.isInteger(certificateId) || certificateId <= 0) {
@@ -180,6 +252,7 @@ export default function AddCertificate() {
       }
 
       setSuccess("Certificate created successfully.");
+
       navigate(`/admin/certificates/${certificateId}`, {
         replace: true,
       });
@@ -191,6 +264,7 @@ export default function AddCertificate() {
     }
   };
 
+  // Show an error if the request ID is missing or invalid.
   if (!requestId || !validRequestId) {
     return (
       <main className="add-certificate-page">
@@ -198,10 +272,13 @@ export default function AddCertificate() {
 
         <section className="add-certificate-state">
           <div className="add-certificate-state-icon">⚠️</div>
+
           <span className="add-certificate-eyebrow">
             REQUEST VALIDATION
           </span>
+
           <h1>Invalid Certificate Request</h1>
+
           <p>
             This certificate creation page requires a valid certificate
             request ID.
@@ -224,6 +301,7 @@ export default function AddCertificate() {
     );
   }
 
+  // Show a loading state while fetching request information.
   if (loadingRequest) {
     return (
       <main className="add-certificate-page">
@@ -238,6 +316,7 @@ export default function AddCertificate() {
     );
   }
 
+  // Show an error if the request could not be loaded.
   if (requestError || !request) {
     return (
       <main className="add-certificate-page">
@@ -245,7 +324,9 @@ export default function AddCertificate() {
 
         <section className="add-certificate-state">
           <div className="add-certificate-state-icon error">!</div>
+
           <h1>Unable to Load Request</h1>
+
           <p className="add-certificate-state-error">
             {requestError || "Certificate request not found."}
           </p>
@@ -272,6 +353,7 @@ export default function AddCertificate() {
             <h1 className="add-certificate-title">
               Create Certificate
             </h1>
+
             <p className="add-certificate-subtitle">
               Create certificate from verified request #{requestId}.
             </p>
@@ -287,6 +369,7 @@ export default function AddCertificate() {
           </button>
         </header>
 
+        {/* Display the original employee certificate request information. */}
         <section className="add-certificate-panel">
           <h2>Request Information</h2>
 
@@ -294,24 +377,30 @@ export default function AddCertificate() {
             <Info label="Request ID" value={`#${requestNumber}`} />
             <Info label="Employee" value={employeeName} />
             <Info label="Email" value={employeeEmail} />
+
             <Info
               label="Certificate Type"
               value={certificateTypeLabel(requestedCertificateType)}
             />
+
             <Info label="Course" value={requestedCourse} />
 
             {requestedDuration !== null &&
               requestedDuration !== undefined &&
               requestedDuration !== "" && (
                 <Info
-                  label="Duration"
+                  label="Requested Duration"
                   value={`${requestedDuration} months`}
                 />
               )}
           </div>
         </section>
 
-        <form className="add-certificate-panel" onSubmit={handleSubmit}>
+        {/* Certificate creation form. */}
+        <form
+          className="add-certificate-panel"
+          onSubmit={handleSubmit}
+        >
           <h2>Certificate Details</h2>
 
           {error && (
@@ -327,30 +416,36 @@ export default function AddCertificate() {
           )}
 
           <div className="add-certificate-form-grid">
+            {/* Select the certificate type. */}
             <div className="add-certificate-field">
               <label htmlFor="certificateType">
                 Certificate Type <span>*</span>
               </label>
+
               <select
                 id="certificateType"
                 name="certificateType"
                 value={certificateType}
-                onChange={(event) =>
-                  setCertificateType(event.target.value)
-                }
+                onChange={(event) => {
+                  setCertificateType(event.target.value);
+                  setError("");
+                }}
                 disabled={saving}
                 required
               >
                 <option value="">Select certificate type</option>
                 <option value="CERT">Certificate</option>
                 <option value="INTR">Internship</option>
+                <option value="EXPR">Experience Certificate</option>
               </select>
             </div>
 
+            {/* Course, programme, or professional role. */}
             <div className="add-certificate-field">
               <label htmlFor="courseName">
-                Course / Program <span>*</span>
+                Course / Program / Role <span>*</span>
               </label>
+
               <input
                 id="courseName"
                 name="courseName"
@@ -358,16 +453,88 @@ export default function AddCertificate() {
                 value={courseName}
                 onChange={(event) => setCourseName(event.target.value)}
                 disabled={saving}
-                placeholder="Enter course name"
+                placeholder="Enter course name or professional role"
                 autoComplete="off"
                 required
               />
             </div>
 
+            {/* Experience duration fields appear only for EXPR. */}
+            {certificateType === "EXPR" && (
+              <>
+                <div className="add-certificate-field">
+                  <label htmlFor="experienceYears">
+                    Experience Duration (Years) <span>*</span>
+                  </label>
+
+                  <input
+                    id="experienceYears"
+                    name="experienceYears"
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="1"
+                    value={experienceYears}
+                    onChange={(event) =>
+                      setExperienceYears(event.target.value)
+                    }
+                    disabled={saving}
+                    placeholder="Enter years"
+                    required
+                  />
+                </div>
+
+                <div className="add-certificate-field">
+                  <label htmlFor="experienceMonths">
+                    Additional Months <span>*</span>
+                  </label>
+
+                  <input
+                    id="experienceMonths"
+                    name="experienceMonths"
+                    type="number"
+                    min="0"
+                    max="11"
+                    step="1"
+                    value={experienceMonths}
+                    onChange={(event) =>
+                      setExperienceMonths(event.target.value)
+                    }
+                    disabled={saving}
+                    placeholder="Enter additional months"
+                    required
+                  />
+                </div>
+
+                {/* Display the calculated total experience duration. */}
+                {experienceDurationMonths > 0 &&
+                  Number.isInteger(experienceDurationMonths) && (
+                    <div className="add-certificate-field">
+                      <label>Calculated Experience</label>
+
+                      <div className="add-certificate-info-value">
+                        {Math.floor(experienceDurationMonths / 12)}{" "}
+                        {Math.floor(experienceDurationMonths / 12) === 1
+                          ? "year"
+                          : "years"}
+                        {experienceDurationMonths % 12 > 0 &&
+                          ` ${experienceDurationMonths % 12} ${
+                            experienceDurationMonths % 12 === 1
+                              ? "month"
+                              : "months"
+                          }`}
+                      </div>
+                    </div>
+                  )}
+              </>
+            )}
+
+            {/* Certificate issuer name. */}
             <div className="add-certificate-field">
               <label htmlFor="issuerName">
                 Issuer Name <span>*</span>
               </label>
+
               <input
                 id="issuerName"
                 name="issuerName"
@@ -381,10 +548,12 @@ export default function AddCertificate() {
               />
             </div>
 
+            {/* Certificate issue date. */}
             <div className="add-certificate-field">
               <label htmlFor="issueDate">
                 Issue Date <span>*</span>
               </label>
+
               <input
                 id="issueDate"
                 name="issueDate"
@@ -397,6 +566,7 @@ export default function AddCertificate() {
             </div>
           </div>
 
+          {/* Form actions. */}
           <div className="add-certificate-actions">
             <button
               type="button"
@@ -421,10 +591,12 @@ export default function AddCertificate() {
   );
 }
 
+// Reusable component for displaying request information.
 function Info({ label, value }) {
   return (
     <div className="add-certificate-info">
       <div className="add-certificate-info-label">{label}</div>
+
       <div className="add-certificate-info-value">
         {value === null || value === undefined || value === ""
           ? "—"

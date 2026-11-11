@@ -2164,13 +2164,13 @@ app.post(
         .trim()
         .toUpperCase();
 
-      if (!["CERT", "INTR"].includes(cleanCertificateType)) {
-        return res.status(400).json({
-          success: false,
+  if (!["CERT", "INTR", "EXPR"].includes(cleanCertificateType)) {
+  return res.status(400).json({
+    success: false,
+    message: "Certificate type must be CERT, INTR, or EXPR.",
+  });
 
-          message: "Certificate type must be CERT or INTR.",
-        });
-      }
+}
 
       // Internship duration is required only for INTR.
       // CERT requests always store NULL duration.

@@ -45,15 +45,83 @@ import "./CertificateDocument.css";
  */
 const NAME_MAX_SIZE = 90;
 const NAME_MIN_SIZE = 40;
+
 function nameFontSize(name) {
-  return Math.max(NAME_MIN_SIZE, Math.min(NAME_MAX_SIZE, Math.floor(1800 / Math.max(name.length, 1))));
+  return Math.max(
+    NAME_MIN_SIZE,
+    Math.min(
+      NAME_MAX_SIZE,
+      Math.floor(1800 / Math.max(name.length, 1)),
+    ),
+  );
 }
 
-/** "in the area of X from A to B." — falls back gracefully when dates are missing. */
-function ProgrammeLine({ courseName, startDate, endDate, durationMonths }) {
+/**
+ * Displays the programme or experience duration.
+ *
+ * CERT / INTR:
+ *   "in the area of Web Development from ... to ..."
+ *
+ * EXPR:
+ *   "for a duration of 2 years and 6 months."
+ */
+function ProgrammeLine({
+  courseName,
+  startDate,
+  endDate,
+  durationMonths,
+  certificateType,
+}) {
+  const type = String(certificateType || "CERT").toUpperCase();
+
   const from = formatCertificateDate(startDate);
   const to = formatCertificateDate(endDate);
 
+  const totalMonths = Number(durationMonths);
+  const hasDuration =
+    Number.isFinite(totalMonths) &&
+    Number.isInteger(totalMonths) &&
+    totalMonths > 0;
+
+  const years = hasDuration ? Math.floor(totalMonths / 12) : 0;
+  const months = hasDuration ? totalMonths % 12 : 0;
+
+  const durationParts = [];
+
+  if (years > 0) {
+    durationParts.push(`${years} ${years === 1 ? "year" : "years"}`);
+  }
+
+  if (months > 0) {
+    durationParts.push(`${months} ${months === 1 ? "month" : "months"}`);
+  }
+
+  const formattedDuration = durationParts.join(" and ");
+
+  // Experience certificate: show employment duration, not programme wording.
+  if (type === "EXPR") {
+    return (
+      <p className="cert-line">
+        {formattedDuration ? (
+          <>
+            for a duration of <strong>{formattedDuration}</strong>
+            {from && to ? (
+              <>
+                {" "}from <strong>{from}</strong> to <strong>{to}</strong>
+              </>
+            ) : null}
+          </>
+        ) : from && to ? (
+          <>
+            from <strong>{from}</strong> to <strong>{to}</strong>
+          </>
+        ) : null}
+        .
+      </p>
+    );
+  }
+
+  // Course and internship certificates retain their existing wording.
   return (
     <p className="cert-line">
       in the area of <strong>{courseName}</strong>
@@ -61,12 +129,9 @@ function ProgrammeLine({ courseName, startDate, endDate, durationMonths }) {
         <>
           {" "}from <strong>{from}</strong> to <strong>{to}</strong>
         </>
-      ) : durationMonths ? (
+      ) : formattedDuration ? (
         <>
-          {" "}for a duration of{" "}
-          <strong>
-            {durationMonths} {Number(durationMonths) === 1 ? "month" : "months"}
-          </strong>
+          {" "}for a duration of <strong>{formattedDuration}</strong>
         </>
       ) : null}
       .
@@ -83,129 +148,171 @@ function ProgrammeLine({ courseName, startDate, endDate, durationMonths }) {
  */
 // memo: skip re-rendering when the page re-renders with the same props
 // (e.g. while the "Generating PDF…" button state changes).
-const CertificateDocument = memo(forwardRef(function CertificateDocument(
-  { certificate, verificationUrl },
-  ref,
-) {
-  const wording = getWording(certificate.certificateType);
-  const name = formatPersonName(certificate.recipientName) || "Certificate Recipient";
-  const isRevoked = certificate.status === "revoked";
+const CertificateDocument = memo(
+  forwardRef(function CertificateDocument(
+    { certificate, verificationUrl },
+    ref,
+  ) {
+    const certificateType = String(
+      certificate.certificateType || "CERT",
+    ).toUpperCase();
 
-  return (
-    <article ref={ref} className="cert" aria-label={`Certificate ${certificate.certificateNo}`}>
-      <CertificateBackground />
+    const wording = getWording(certificateType);
+    const name =
+      formatPersonName(certificate.recipientName) || "Certificate Recipient";
+    const isRevoked = certificate.status === "revoked";
+    const isExperience = certificateType === "EXPR";
 
-      {/* ---------------- HEADER ---------------- */}
-      <header className="cert-header">
-        <div className="cert-brand">
-          <EsMark height={74} />
-          <div className="cert-brand-text">
-            <span className="cert-brand-line1">{COMPANY.brandLine1}</span>
-            <span className="cert-brand-line2">{COMPANY.brandLine2}</span>
-          </div>
-        </div>
+    return (
+      <article
+        ref={ref}
+        className="cert"
+        aria-label={`Certificate ${certificate.certificateNo}`}
+      >
+        <CertificateBackground />
 
-        <span className="cert-divider" />
-
-        {ISO_BADGES.map((badge, index) => (
-          <div key={badge.standard} className="cert-iso-group">
-            {index > 0 && <span className="cert-divider" />}
-            <div className="cert-iso">
-              <div className="cert-iso-globe">
-                <IsoGlobe />
-                <span>ISO</span>
-              </div>
-              <strong>{badge.standard}</strong>
-              {badge.lines.map((line) => (
-                <small key={line}>{line}</small>
-              ))}
+        {/* ---------------- HEADER ---------------- */}
+        <header className="cert-header">
+          <div className="cert-brand">
+            <EsMark height={74} />
+            <div className="cert-brand-text">
+              <span className="cert-brand-line1">{COMPANY.brandLine1}</span>
+              <span className="cert-brand-line2">{COMPANY.brandLine2}</span>
             </div>
           </div>
-        ))}
-      </header>
 
-      {/* ---------------- TITLE ---------------- */}
-      <section className="cert-body">
-        <h1 className="cert-title">CERTIFICATE</h1>
+          <span className="cert-divider" />
 
-        <div className="cert-ribbon">
-          <span className="cert-ribbon-rule" />
-          <div className="cert-ribbon-band">
-            <TitleRibbon />
-            <span>{wording.subtitle}</span>
+          {ISO_BADGES.map((badge, index) => (
+            <div key={badge.standard} className="cert-iso-group">
+              {index > 0 && <span className="cert-divider" />}
+              <div className="cert-iso">
+                <div className="cert-iso-globe">
+                  <IsoGlobe />
+                  <span>ISO</span>
+                </div>
+                <strong>{badge.standard}</strong>
+                {badge.lines.map((line) => (
+                  <small key={line}>{line}</small>
+                ))}
+              </div>
+            </div>
+          ))}
+        </header>
+
+        {/* ---------------- TITLE ---------------- */}
+        <section className="cert-body">
+          <h1 className="cert-title">CERTIFICATE</h1>
+
+          <div className="cert-ribbon">
+            <span className="cert-ribbon-rule" />
+            <div className="cert-ribbon-band">
+              <TitleRibbon />
+              <span>{wording.subtitle}</span>
+            </div>
+            <span className="cert-ribbon-rule" />
           </div>
-          <span className="cert-ribbon-rule" />
-        </div>
 
-        <p className="cert-line cert-intro">This is to certify that</p>
+          <p className="cert-line cert-intro">This is to certify that</p>
 
-        <h2 className="cert-name" style={{ fontSize: nameFontSize(name) }}>
-          {name}
-        </h2>
-        <span className="cert-name-rule" />
+          <h2 className="cert-name" style={{ fontSize: nameFontSize(name) }}>
+            {name}
+          </h2>
+          <span className="cert-name-rule" />
 
-        <p className="cert-line">has successfully completed {wording.programme} at</p>
-        <p className="cert-line cert-company">{COMPANY.bodyName}</p>
-        <ProgrammeLine
-          courseName={certificate.courseName || "the assigned programme"}
-          startDate={certificate.startDate}
-          endDate={certificate.endDate}
-          durationMonths={certificate.durationMonths}
-        />
-
-        <p className="cert-summary">
-          {wording.summary.replace("{name}", firstName(certificate.recipientName))}
-        </p>
-      </section>
-
-      {/* ---------------- FOOTER ---------------- */}
-      <footer className="cert-footer">
-        <div className="cert-signature">
-          <span className="cert-signature-script">{COMPANY.signatoryName}</span>
-          {/* short pen stroke under the signature, as in the sample */}
-          <svg className="cert-signature-flourish" viewBox="0 0 92 14" aria-hidden="true">
-            <path d="M 2 12 Q 40 6 90 2" fill="none" stroke="#1b2f6b" strokeWidth="2.4" strokeLinecap="round" />
-          </svg>
-          <span className="cert-signature-rule" />
-          <strong>{COMPANY.signatoryName}</strong>
-          <span>{COMPANY.signatoryTitle}</span>
-          <small>{COMPANY.legalName}</small>
-        </div>
-
-        <div className="cert-seal">
-          <GoldSeal />
-        </div>
-
-        <span className="cert-divider cert-divider-footer" />
-
-        <dl className="cert-meta">
-          <div>
-            <dt>Certificate ID:</dt>
-            <dd>{certificate.certificateNo || "—"}</dd>
-          </div>
-          <div>
-            <dt>Issued On:</dt>
-            <dd>{formatCertificateDate(certificate.issueDate) || "—"}</dd>
-          </div>
-        </dl>
-
-        <div className="cert-qr">
-          {verificationUrl ? (
-            <QRCodeSVG value={verificationUrl} size={104} level="M" marginSize={0} fgColor="#111111" />
+          {isExperience ? (
+            <p className="cert-line">has successfully worked with</p>
           ) : (
-            <span className="cert-qr-missing">QR unavailable</span>
+            <p className="cert-line">
+              {wording.intro} {wording.programme} at
+            </p>
           )}
-          <span>Verify Certificate</span>
-        </div>
-      </footer>
 
-      {isRevoked && (
-        <div className="cert-revoked" role="status">
-          REVOKED
-        </div>
-      )}
-    </article>
-  );
-}));
+          <p className="cert-line cert-company">{COMPANY.bodyName}</p>
+
+          <ProgrammeLine
+            courseName={certificate.courseName || "the assigned programme"}
+            startDate={certificate.startDate}
+            endDate={certificate.endDate}
+            durationMonths={certificate.durationMonths}
+            certificateType={certificateType}
+          />
+
+          <p className="cert-summary">
+            {wording.summary.replace(
+              "{name}",
+              firstName(certificate.recipientName),
+            )}
+          </p>
+        </section>
+
+        {/* ---------------- FOOTER ---------------- */}
+        <footer className="cert-footer">
+          <div className="cert-signature">
+            <span className="cert-signature-script">
+              {COMPANY.signatoryName}
+            </span>
+            {/* short pen stroke under the signature, as in the sample */}
+            <svg
+              className="cert-signature-flourish"
+              viewBox="0 0 92 14"
+              aria-hidden="true"
+            >
+              <path
+                d="M 2 12 Q 40 6 90 2"
+                fill="none"
+                stroke="#1b2f6b"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="cert-signature-rule" />
+            <strong>{COMPANY.signatoryName}</strong>
+            <span>{COMPANY.signatoryTitle}</span>
+            <small>{COMPANY.legalName}</small>
+          </div>
+
+          <div className="cert-seal">
+            <GoldSeal />
+          </div>
+
+          <span className="cert-divider cert-divider-footer" />
+
+          <dl className="cert-meta">
+            <div>
+              <dt>Certificate ID:</dt>
+              <dd>{certificate.certificateNo || "—"}</dd>
+            </div>
+            <div>
+              <dt>Issued On:</dt>
+              <dd>{formatCertificateDate(certificate.issueDate) || "—"}</dd>
+            </div>
+          </dl>
+
+          <div className="cert-qr">
+            {verificationUrl ? (
+              <QRCodeSVG
+                value={verificationUrl}
+                size={104}
+                level="M"
+                marginSize={0}
+                fgColor="#111111"
+              />
+            ) : (
+              <span className="cert-qr-missing">QR unavailable</span>
+            )}
+            <span>Verify Certificate</span>
+          </div>
+        </footer>
+
+        {isRevoked && (
+          <div className="cert-revoked" role="status">
+            REVOKED
+          </div>
+        )}
+      </article>
+    );
+  }),
+);
 
 export default CertificateDocument;

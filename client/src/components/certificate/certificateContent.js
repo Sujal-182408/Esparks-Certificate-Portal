@@ -26,40 +26,62 @@ export const COMPANY = {
 
 /** ISO badges shown in the header (keep in sync with real certifications). */
 export const ISO_BADGES = [
-  { standard: "9001:2015", lines: ["Quality Management", "System"] }, // as in the reference mark
-  { standard: "ISO/IEC 27001:2022", lines: ["Information Security", "Management System"] },
+  { standard: "9001:2015", lines: ["Quality Management", "System"] },
+  {
+    standard: "ISO/IEC 27001:2022",
+    lines: ["Information Security", "Management System"],
+  },
 ];
 
 /**
  * Wording per certificate type.
- *   INTR = internship, CERT = course / training certificate.
+ * INTR = internship, CERT = course / training certificate,
+ * EXPR = experience certificate.
  * `{name}` in `summary` is replaced with the recipient's first name.
  */
 const WORDING = {
   INTR: {
     subtitle: "OF INTERNSHIP COMPLETION",
     programme: "the Internship Program",
+    intro: "has successfully completed",
     summary:
       "During the internship, {name} demonstrated a strong commitment to learning, contributed effectively to assigned projects, and upheld our values of quality, security, and continuous improvement.",
   },
+
   CERT: {
     subtitle: "OF COURSE COMPLETION",
     programme: "the Training Program",
+    intro: "has successfully completed",
     summary:
       "During the program, {name} demonstrated a strong commitment to learning, completed every assigned module, and upheld our values of quality, security, and continuous improvement.",
+  },
+
+  EXPR: {
+    subtitle: "OF EXPERIENCE",
+    programme: "professional responsibilities",
+    intro: "has successfully worked with",
+    summary:
+      "{name} demonstrated professionalism, dedication, and valuable contributions throughout the tenure with our organization.",
   },
 };
 
 export function getWording(certificateType) {
-  return WORDING[certificateType] || WORDING.CERT;
+  const type = String(certificateType || "CERT")
+    .trim()
+    .toUpperCase();
+
+  return WORDING[type] || WORDING.CERT;
 }
 
 /** "2026-08-01" or a Date -> "01 August 2026" (the format used on the certificate). */
 export function formatCertificateDate(value) {
   if (!value) return "";
+
   // Date-only strings are parsed as UTC; format in UTC so the day never shifts.
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return String(value);
+
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "long",
@@ -76,7 +98,10 @@ export function formatPersonName(name = "") {
   return String(name)
     .trim()
     .replace(/\s+/g, " ")
-    .replace(/(^|[\s'-])(\p{L})/gu, (_, separator, letter) => separator + letter.toUpperCase());
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, separator, letter) => separator + letter.toUpperCase(),
+    );
 }
 
 export function firstName(name = "") {
@@ -93,11 +118,19 @@ export function normalizeCertificate(raw = {}) {
     recipientName: raw.recipient_name || raw.recipientName || "",
     courseName: raw.course_name || raw.courseName || "",
     certificateNo: raw.certificate_no || raw.certificateNo || "",
-    certificateType: String(raw.certificate_type || raw.certificateType || "CERT").toUpperCase(),
+
+    certificateType: String(
+      raw.certificate_type || raw.certificateType || "CERT",
+    )
+      .trim()
+      .toUpperCase(),
+
     durationMonths: raw.duration_months ?? raw.durationMonths ?? null,
+
     // Optional programme dates ("from ... to ..."). Shown when present.
     startDate: raw.start_date || raw.startDate || "",
     endDate: raw.end_date || raw.endDate || "",
+
     issueDate: raw.issue_date || raw.issueDate || "",
     verificationToken: raw.verification_token || raw.verificationToken || "",
     status: String(raw.status || "issued").toLowerCase(),
@@ -107,5 +140,7 @@ export function normalizeCertificate(raw = {}) {
 
 /** Public URL encoded in the QR code. */
 export function buildVerificationUrl(token) {
-  return token ? `${window.location.origin}/verify?token=${encodeURIComponent(token)}` : "";
+  return token
+    ? `${window.location.origin}/verify?token=${encodeURIComponent(token)}`
+    : "";
 }

@@ -28,8 +28,8 @@ import {
   Bell,
 } from "lucide-react";
 
-import brandLogo from "/logo.png";
-import banner from "/banner.png";
+import brandLogo from "../assets/logo.png";
+import banner from "../assets/banner.png";
 
 import {
   apiRequest,
@@ -562,10 +562,7 @@ export default function EmployeeDashboard() {
     loadDashboard();
   }, [loadDashboard]);
 
-  /* =======================================================
-     REAL-TIME SOCKET NOTIFICATIONS
-  ====================================================== */
-
+  
   /* =======================================================
    REAL-TIME EMPLOYEE NOTIFICATIONS AND DASHBOARD UPDATES
 ======================================================= */
@@ -1252,13 +1249,7 @@ export default function EmployeeDashboard() {
         {/* FOOTER */}
 
         <footer className="ed-footer">
-          <div className="ed-footer-left">
-            <div className="ed-footer-icon">
-              <img src={brandLogo} alt="Esparks IT Solution" />
-            </div>
-
-            <span>ESPARKS IT SOLUTIONS Secure Credential Network</span>
-          </div>
+          
 
           <div className="ed-footer-right">
             <span>Protected workspace</span>

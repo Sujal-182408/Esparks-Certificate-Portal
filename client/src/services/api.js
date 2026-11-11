@@ -55,7 +55,9 @@ export async function apiRequest(path, options = {}) {
     });
   } catch (networkError) {
     // fetch only throws when the server could not be reached at all.
-    const error = new Error("Cannot reach the server. Check your internet connection and try again.");
+    const error = new Error(
+      "Cannot reach the server. Check your internet connection and try again.",
+    );
     error.cause = networkError;
     error.status = 0;
     throw error;
@@ -64,11 +66,16 @@ export async function apiRequest(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const error = new Error(data?.message || `Request failed with status ${response.status}`);
+    const error = new Error(
+      data?.message || `Request failed with status ${response.status}`,
+    );
     error.status = response.status;
     error.data = data;
     if (!(quiet401 && response.status === 401) && import.meta.env.DEV) {
-      console.error(`API ${fetchOptions.method || "GET"} ${path} -> ${response.status}`, data);
+      console.error(
+        `API ${fetchOptions.method || "GET"} ${path} -> ${response.status}`,
+        data,
+      );
     }
     throw error;
   }
@@ -79,7 +86,10 @@ export async function apiRequest(path, options = {}) {
 // Small shortcuts so call sites read naturally.
 const get = (path, options) => apiRequest(path, options);
 const send = (method, path, body) =>
-  apiRequest(path, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  apiRequest(path, {
+    method,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
 
 const id = (value) => encodeURIComponent(String(value));
 
@@ -88,10 +98,15 @@ const id = (value) => encodeURIComponent(String(value));
 ========================================================= */
 
 export const registerEmployee = (name, email, password) =>
-  send("POST", "/employee-auth/register", { name: name.trim(), email: email.trim(), password });
+  send("POST", "/employee-auth/register", {
+    name: name.trim(),
+    email: email.trim(),
+    password,
+  });
 export const employeeLogin = (email, password) =>
   send("POST", "/employee-auth/login", { email: email.trim(), password });
-export const getCurrentEmployee = (options) => get("/employee-auth/me", options);
+export const getCurrentEmployee = (options) =>
+  get("/employee-auth/me", options);
 export const employeeLogout = () => send("POST", "/employee-auth/logout");
 
 /* =========================================================
@@ -118,17 +133,22 @@ export const resetPassword = (type, token, password) =>
 ========================================================= */
 
 export const getAdminEmployees = () => get("/admin/employees");
-export const getAdminEmployee = (employeeId) => get(`/admin/employees/${id(employeeId)}`);
+export const getAdminEmployee = (employeeId) =>
+  get(`/admin/employees/${id(employeeId)}`);
 export const setEmployeeActive = (employeeId, isActive) =>
-  send("PATCH", `/admin/employees/${id(employeeId)}/status`, { is_active: isActive });
+  send("PATCH", `/admin/employees/${id(employeeId)}/status`, {
+    is_active: isActive,
+  });
 
 /* =========================================================
    ADMIN — CERTIFICATES     (server: routes/adminCertificates.routes.js)
 ========================================================= */
 
 export const getAdminCertificates = () => get("/admin/certificates");
-export const getAdminCertificate = (certificateId) => get(`/admin/certificates/${id(certificateId)}`);
-export const createCertificate = (data) => send("POST", "/admin/certificates", data);
+export const getAdminCertificate = (certificateId) =>
+  get(`/admin/certificates/${id(certificateId)}`);
+export const createCertificate = (data) =>
+  send("POST", "/admin/certificates", data);
 export const updateCertificate = (certificateId, data) =>
   send("PUT", `/admin/certificates/${id(certificateId)}`, data);
 
@@ -146,25 +166,33 @@ export const revokeAdminCertificate = (certificateId, options = {}) =>
 export const requestCertificateDeleteOtp = (certificateId) =>
   send("POST", `/admin/certificates/${id(certificateId)}/delete-otp`);
 export const confirmCertificateDelete = (certificateId, challengeId, otp) =>
-  send("POST", `/admin/certificates/${id(certificateId)}/confirm-delete`, { challengeId, otp });
+  send("POST", `/admin/certificates/${id(certificateId)}/confirm-delete`, {
+    challengeId,
+    otp,
+  });
 
 /* =========================================================
    ADMIN — CERTIFICATE REQUESTS
 ========================================================= */
 
-export const getAdminCertificateRequests = () => get("/admin/certificate-requests");
+export const getAdminCertificateRequests = () =>
+  get("/admin/certificate-requests");
 export const getAdminCertificateRequest = (requestId) =>
   get(`/admin/certificate-requests/${id(requestId)}`);
 export const rejectCertificateRequest = (requestId, reason) =>
-  send("POST", `/admin/certificate-requests/${id(requestId)}/reject`, { reason });
+  send("POST", `/admin/certificate-requests/${id(requestId)}/reject`, {
+    reason,
+  });
 
 /* =========================================================
    EMPLOYEE AREA            (server: routes/employee.routes.js)
 ========================================================= */
 
 export const getEmployeeCertificates = () => get("/employee/certificates");
-export const getEmployeeCertificateRequests = () => get("/employee/certificate-requests");
-export const submitCertificateRequest = (data) => send("POST", "/employee/certificate-requests", data);
+export const getEmployeeCertificateRequests = () =>
+  get("/employee/certificate-requests");
+export const submitCertificateRequest = (data) =>
+  send("POST", "/employee/certificate-requests", data);
 export const getEmployeeQR = () => get("/employee/qr");
 
 /* =========================================================
@@ -179,13 +207,16 @@ export const verifyCertificate = (token) => get(`/verify/${id(token)}`);
 ========================================================= */
 
 export const getAdminNotifications = () => get("/admin/notifications");
-export const getAdminUnreadNotificationCount = () => get("/admin/notifications/unread-count");
+export const getAdminUnreadNotificationCount = () =>
+  get("/admin/notifications/unread-count");
 export const markAdminNotificationAsRead = (notificationId) =>
   send("PATCH", `/admin/notifications/${id(notificationId)}/read`);
-export const markAllAdminNotificationsAsRead = () => send("PATCH", "/admin/notifications/read-all");
+export const markAllAdminNotificationsAsRead = () =>
+  send("PATCH", "/admin/notifications/read-all");
 
 export const getEmployeeNotifications = () => get("/employee/notifications");
-export const getEmployeeUnreadNotificationCount = () => get("/employee/notifications/unread-count");
+export const getEmployeeUnreadNotificationCount = () =>
+  get("/employee/notifications/unread-count");
 export const markEmployeeNotificationAsRead = (notificationId) =>
   send("PATCH", `/employee/notifications/${id(notificationId)}/read`);
 export const markAllEmployeeNotificationsAsRead = () =>
