@@ -109,7 +109,7 @@ export default function Home() {
             "
           >
             Esparks IT Solutions Private Limited provides a secure and reliable way to verify certificates
-            using unique verification tokens and QR codes.
+            using unique verification links and QR codes.
           </p>
 
           <div
