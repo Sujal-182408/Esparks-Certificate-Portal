@@ -640,7 +640,7 @@ export default function VerifyCertificate() {
                 <div>
                   <h2 className="text-lg font-bold">Manual Verification</h2>
                   <p className="text-sm text-slate-500">
-                    Enter the certificate token or paste its link.
+                    Enter the certificate link to verify.
                   </p>
                 </div>
               </div>
@@ -650,7 +650,7 @@ export default function VerifyCertificate() {
                   htmlFor="verification-token"
                   className="block text-sm font-medium text-slate-300"
                 >
-                  Verification Token / Link
+                  Verification Link
                 </label>
 
                 <input
@@ -661,7 +661,7 @@ export default function VerifyCertificate() {
                     setManualToken(event.target.value);
                     setError("");
                   }}
-                  placeholder="Paste certificate link or token"
+                  placeholder="Paste certificate link"
                   autoComplete="off"
                   spellCheck="false"
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
@@ -702,7 +702,7 @@ export default function VerifyCertificate() {
             <LockKeyhole className="mx-auto mb-3 text-cyan-400" size={25} />
             <h3 className="text-sm font-semibold">Secure Verification</h3>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Each certificate uses a unique verification token.
+              Each certificate uses a unique verification Link.
             </p>
           </div>
 
